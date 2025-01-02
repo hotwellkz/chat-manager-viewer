@@ -11,7 +11,14 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(cors());
+// Настройка CORS для разрешения запросов с фронтенда
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://your-frontend-url.vercel.app'] // Замените на URL вашего фронтенда
+    : ['http://localhost:5173', 'http://localhost:3000'],
+  credentials: true
+}));
+
 app.use(express.json());
 
 const openai = new OpenAI({
@@ -193,6 +200,11 @@ app.post('/api/files', async (req, res) => {
 
 app.use('/uploads', express.static(uploadsDir));
 
-app.listen(port, () => {
+// Добавляем маршрут для проверки работоспособности
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
+app.listen(port, '0.0.0.0', () => {
   console.log(`Server is running on port ${port}`);
 });
