@@ -15,12 +15,11 @@ export const PromptInput = () => {
 
     setIsLoading(true);
     try {
-      // Получаем текущего пользователя
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Пользователь не авторизован");
 
-      // Отправляем запрос на бэкенд
-      const response = await fetch("https://backendlovable006.onrender.com/api/process-prompt", {
+      // Обновляем URL для запроса
+      const response = await fetch(`${process.env.VITE_BACKEND_URL || 'http://localhost:3000'}/api/prompt`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -30,18 +29,11 @@ export const PromptInput = () => {
 
       if (!response.ok) throw new Error("Ошибка при обработке запроса");
       
-      const { files } = await response.json();
-
-      // Загружаем файлы в Supabase Storage
-      const { data: uploadResponse, error: uploadError } = await supabase.functions.invoke('handle-files', {
-        body: { files, userId: user.id }
-      });
-
-      if (uploadError) throw uploadError;
+      const data = await response.json();
 
       toast({
         title: "Успешно!",
-        description: "Файлы успешно сохранены",
+        description: "Запрос обработан",
       });
 
       setPrompt("");
