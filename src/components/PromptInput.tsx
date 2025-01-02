@@ -2,8 +2,9 @@ import { useState } from "react";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { Send, Paperclip } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+
+const API_URL = "https://your-render-url.onrender.com"; // Замените на ваш URL после деплоя
 
 export const PromptInput = () => {
   const [prompt, setPrompt] = useState("");
@@ -16,22 +17,10 @@ export const PromptInput = () => {
     
     setIsLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        toast({
-          title: "Ошибка",
-          description: "Необходимо войти в систему",
-          variant: "destructive",
-        });
-        return;
-      }
-
       // Отправляем промт на обработку
-      const response = await fetch('/functions/v1/process-prompt', {
+      const response = await fetch(`${API_URL}/api/prompt`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
@@ -44,17 +33,16 @@ export const PromptInput = () => {
         throw new Error('Failed to process prompt');
       }
 
-      const { response: aiResponse } = await response.json();
+      const { files, description } = await response.json();
 
       // Если есть файлы для сохранения, отправляем их
-      if (aiResponse.files && aiResponse.files.length > 0) {
-        const filesResponse = await fetch('/functions/v1/handle-files', {
+      if (files && files.length > 0) {
+        const filesResponse = await fetch(`${API_URL}/api/files`, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ files: aiResponse.files }),
+          body: JSON.stringify({ files }),
         });
 
         if (!filesResponse.ok) {
