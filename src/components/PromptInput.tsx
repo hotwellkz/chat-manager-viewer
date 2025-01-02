@@ -18,8 +18,8 @@ export const PromptInput = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Пользователь не авторизован");
 
-      // Обновляем URL для запроса
-      const response = await fetch(`${process.env.VITE_BACKEND_URL || 'http://localhost:3000'}/api/prompt`, {
+      // Используем URL бэкенда на Render
+      const response = await fetch("https://backendlovable006.onrender.com/api/prompt", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
