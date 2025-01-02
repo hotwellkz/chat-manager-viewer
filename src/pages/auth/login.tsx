@@ -1,21 +1,21 @@
 import { useEffect } from "react";
 import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
-import { useRouter } from "next/router";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 
 const LoginPage = () => {
-  const router = useRouter();
+  const navigate = useNavigate();
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) {
-        router.push("/");
+        navigate("/");
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [router]);
+  }, [navigate]);
 
   return (
     <div className="min-h-screen bg-editor-background flex items-center justify-center p-4">

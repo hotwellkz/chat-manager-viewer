@@ -7,7 +7,7 @@ import {
   LogIn,
   LogOut
 } from "lucide-react";
-import { useRouter } from "next/router";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "./ui/use-toast";
 
@@ -15,7 +15,7 @@ export const Header = () => {
   const [isPanelOpen, setIsPanelOpen] = useState(true);
   const [isChatView, setIsChatView] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const router = useRouter();
+  const navigate = useNavigate();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -42,7 +42,7 @@ export const Header = () => {
         });
       }
     } else {
-      router.push("/auth/login");
+      navigate("/auth/login");
     }
   };
 

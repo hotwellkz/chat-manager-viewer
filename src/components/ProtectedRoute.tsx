@@ -1,19 +1,20 @@
 import { useEffect } from "react";
-import { useRouter } from "next/router";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 
 export const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const router = useRouter();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!session && router.pathname !== "/auth/login") {
-        router.push("/auth/login");
+      if (!session && location.pathname !== "/auth/login") {
+        navigate("/auth/login");
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [router]);
+  }, [navigate, location]);
 
   return <>{children}</>;
 };
