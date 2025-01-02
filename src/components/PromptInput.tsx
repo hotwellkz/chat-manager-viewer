@@ -4,7 +4,7 @@ import { Textarea } from "./ui/textarea";
 import { Send, Paperclip } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-const API_URL = "https://your-render-url.onrender.com"; // Замените на ваш URL после деплоя
+const API_URL = "https://backendlovable006.onrender.com"; // Обновленный URL бэкенда
 
 export const PromptInput = () => {
   const [prompt, setPrompt] = useState("");
