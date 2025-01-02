@@ -1,11 +1,32 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState } from "react";
+import { Header } from "@/components/Header";
+import { ChatHistory } from "@/components/ChatHistory";
+import { PromptInput } from "@/components/PromptInput";
+import { FileManager } from "@/components/FileManager";
+import { Preview } from "@/components/Preview";
 
 const Index = () => {
+  const [showPreview, setShowPreview] = useState(true);
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">Start building your amazing project here!</p>
+    <div className="h-screen flex flex-col bg-editor-background text-editor-foreground">
+      <Header />
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left panel */}
+        <div className="w-[300px] flex flex-col">
+          <ChatHistory />
+          <PromptInput />
+        </div>
+        
+        {/* Middle panel */}
+        <div className="w-[250px]">
+          <FileManager />
+        </div>
+        
+        {/* Right panel */}
+        <div className="flex-1">
+          <Preview />
+        </div>
       </div>
     </div>
   );
