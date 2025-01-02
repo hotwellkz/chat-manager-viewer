@@ -17,43 +17,57 @@ export const PromptInput = () => {
     
     setIsLoading(true);
     try {
-      // Отправляем промт на обработку
-      const response = await fetch(`${API_URL}/api/prompt`, {
+      // Сначала пробуем обновить существующие файлы
+      const updateResponse = await fetch(`${API_URL}/api/update-files`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          prompt,
-          framework 
-        }),
+        body: JSON.stringify({ prompt }),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to process prompt');
-      }
-
-      const { files, description } = await response.json();
-
-      // Если есть файлы для сохранения, отправляем их
-      if (files && files.length > 0) {
-        const filesResponse = await fetch(`${API_URL}/api/files`, {
+      if (!updateResponse.ok) {
+        // Если нет существующих файлов или произошла ошибка, 
+        // используем стандартный endpoint для создания новых файлов
+        const response = await fetch(`${API_URL}/api/prompt`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ files }),
+          body: JSON.stringify({ 
+            prompt,
+            framework 
+          }),
         });
 
-        if (!filesResponse.ok) {
-          throw new Error('Failed to save files');
+        if (!response.ok) {
+          throw new Error('Failed to process prompt');
+        }
+
+        const { files, description } = await response.json();
+
+        if (files && files.length > 0) {
+          const filesResponse = await fetch(`${API_URL}/api/files`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ files }),
+          });
+
+          if (!filesResponse.ok) {
+            throw new Error('Failed to save files');
+          }
+        }
+      } else {
+        const result = await updateResponse.json();
+        if (result.description) {
+          toast({
+            title: "Успех",
+            description: result.description,
+          });
         }
       }
-
-      toast({
-        title: "Успех",
-        description: "Промт успешно обработан",
-      });
 
       setPrompt("");
     } catch (error) {
