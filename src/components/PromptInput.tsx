@@ -1,80 +1,55 @@
 import { useState } from "react";
-import { Button } from "./ui/button";
-import { Textarea } from "./ui/textarea";
-import { Send, Paperclip } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-
-const API_URL = "https://backendlovable006.onrender.com"; // Обновленный URL бэкенда
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 export const PromptInput = () => {
   const [prompt, setPrompt] = useState("");
-  const [framework, setFramework] = useState<"nodejs" | "react" | "vue">("react");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!prompt.trim()) return;
-    
+
     setIsLoading(true);
     try {
-      // Сначала пробуем обновить существующие файлы
-      const updateResponse = await fetch(`${API_URL}/api/update-files`, {
-        method: 'POST',
+      // Получаем текущего пользователя
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Пользователь не авторизован");
+
+      // Отправляем запрос на бэкенд
+      const response = await fetch("https://backendlovable006.onrender.com/api/process-prompt", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ prompt }),
       });
 
-      if (!updateResponse.ok) {
-        // Если нет существующих файлов или произошла ошибка, 
-        // используем стандартный endpoint для создания новых файлов
-        const response = await fetch(`${API_URL}/api/prompt`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-            prompt,
-            framework 
-          }),
-        });
+      if (!response.ok) throw new Error("Ошибка при обработке запроса");
+      
+      const { files } = await response.json();
 
-        if (!response.ok) {
-          throw new Error('Failed to process prompt');
-        }
+      // Загружаем файлы в Supabase Storage
+      const { data: uploadResponse, error: uploadError } = await supabase.functions.invoke('handle-files', {
+        body: { files, userId: user.id }
+      });
 
-        const { files, description } = await response.json();
+      if (uploadError) throw uploadError;
 
-        if (files && files.length > 0) {
-          const filesResponse = await fetch(`${API_URL}/api/files`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ files }),
-          });
-
-          if (!filesResponse.ok) {
-            throw new Error('Failed to save files');
-          }
-        }
-      } else {
-        const result = await updateResponse.json();
-        if (result.description) {
-          toast({
-            title: "Успех",
-            description: result.description,
-          });
-        }
-      }
+      toast({
+        title: "Успешно!",
+        description: "Файлы успешно сохранены",
+      });
 
       setPrompt("");
     } catch (error) {
-      console.error('Error:', error);
+      console.error("Error:", error);
       toast({
         title: "Ошибка",
-        description: "Не удалось обработать промт",
+        description: error.message || "Произошла ошибка при обработке запроса",
         variant: "destructive",
       });
     } finally {
@@ -83,39 +58,20 @@ export const PromptInput = () => {
   };
 
   return (
-    <div className="p-4 border-t border-border">
-      <div className="flex gap-2 mb-2">
-        {["nodejs", "react", "vue"].map((fw) => (
-          <Button
-            key={fw}
-            variant={framework === fw ? "default" : "outline"}
-            size="sm"
-            onClick={() => setFramework(fw as typeof framework)}
-          >
-            {fw}
-          </Button>
-        ))}
-      </div>
-      <div className="flex gap-2">
+    <div className="p-4 border-t">
+      <form onSubmit={handleSubmit} className="space-y-4">
         <Textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Введите ваш промт..."
-          className="min-h-[40px] resize-none"
+          placeholder="Введите ваш запрос..."
+          className="min-h-[100px]"
         />
-        <div className="flex flex-col gap-2">
-          <Button size="icon" variant="ghost">
-            <Paperclip className="h-4 w-4" />
-          </Button>
-          <Button 
-            size="icon" 
-            onClick={handleSubmit}
-            disabled={isLoading}
-          >
-            <Send className="h-4 w-4" />
+        <div className="flex justify-end">
+          <Button type="submit" disabled={isLoading}>
+            {isLoading ? "Обработка..." : "Отправить"}
           </Button>
         </div>
-      </div>
+      </form>
     </div>
   );
 };

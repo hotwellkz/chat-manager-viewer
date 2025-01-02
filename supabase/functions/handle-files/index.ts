@@ -1,5 +1,5 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,76 +8,78 @@ const corsHeaders = {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
     )
 
-    // Получаем пользователя из токена
-    const authHeader = req.headers.get('Authorization')!
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    )
-
-    if (userError || !user) {
-      throw new Error('Unauthorized')
-    }
-
-    const { files } = await req.json()
+    const { files, userId } = await req.json()
 
     const results = []
-
     for (const file of files) {
-      const filePath = `${user.id}/${crypto.randomUUID()}-${file.path.split('/').pop()}`
+      const { path, content } = file
       
-      // Сохраняем содержимое файла
-      const { error: uploadError } = await supabaseClient.storage
+      // Конвертируем содержимое в Uint8Array
+      const contentBytes = new TextEncoder().encode(content)
+      
+      // Загружаем файл в storage
+      const { data: uploadData, error: uploadError } = await supabaseClient
+        .storage
         .from('project_files')
-        .upload(filePath, new Blob([file.content]), {
+        .upload(`${userId}/${path}`, contentBytes, {
           contentType: 'text/plain',
-          upsert: false
+          upsert: true
         })
 
       if (uploadError) throw uploadError
 
-      // Получаем публичную ссылку на файл
-      const { data: { publicUrl }, error: urlError } = supabaseClient.storage
+      // Получаем публичную ссылку
+      const { data: urlData } = await supabaseClient
+        .storage
         .from('project_files')
-        .getPublicUrl(filePath)
+        .getPublicUrl(`${userId}/${path}`)
 
-      if (urlError) throw urlError
-
-      // Сохраняем метаданные файла
-      const { error: dbError } = await supabaseClient
+      // Сохраняем метаданные в базу данных
+      const { data: fileData, error: dbError } = await supabaseClient
         .from('files')
-        .insert({
-          user_id: user.id,
-          filename: file.path.split('/').pop(),
-          file_path: filePath,
+        .upsert({
+          user_id: userId,
+          filename: path.split('/').pop(),
+          file_path: `${userId}/${path}`,
           content_type: 'text/plain',
-          size: file.content.length
+          size: contentBytes.length
         })
+        .select()
+        .single()
 
       if (dbError) throw dbError
 
       results.push({
-        path: file.path,
-        url: publicUrl
+        path,
+        url: urlData.publicUrl,
+        id: fileData.id
       })
     }
 
     return new Response(
-      JSON.stringify({ files: results }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: true, data: results }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200 
+      }
     )
+
   } catch (error) {
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      JSON.stringify({ success: false, error: error.message }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400
+      }
     )
   }
 })
