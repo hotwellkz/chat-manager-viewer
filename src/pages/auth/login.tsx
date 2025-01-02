@@ -19,7 +19,7 @@ const LoginPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#1A1F2C] to-[#6E59A5] flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-[#2A2F3C]/80 backdrop-blur-sm rounded-xl shadow-2xl p-8 transform transition-all hover:scale-[1.01]">
+      <div className="w-full max-w-md bg-[#2A2F3C]/80 backdrop-blur-sm rounded-xl shadow-2xl p-8">
         <h1 className="text-3xl font-bold text-center mb-8 bg-gradient-to-r from-[#9b87f5] to-[#D6BCFA] bg-clip-text text-transparent">
           Вход в систему
         </h1>
