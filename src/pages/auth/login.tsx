@@ -18,9 +18,9 @@ const LoginPage = () => {
   }, [navigate]);
 
   return (
-    <div className="min-h-screen bg-editor-background flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-background rounded-lg shadow-lg p-6">
-        <h1 className="text-2xl font-bold text-center mb-6 text-foreground">
+    <div className="min-h-screen bg-gradient-to-br from-[#1A1F2C] to-[#6E59A5] flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-[#2A2F3C]/80 backdrop-blur-sm rounded-xl shadow-2xl p-8 transform transition-all hover:scale-[1.01]">
+        <h1 className="text-3xl font-bold text-center mb-8 bg-gradient-to-r from-[#9b87f5] to-[#D6BCFA] bg-clip-text text-transparent">
           Вход в систему
         </h1>
         <Auth
@@ -30,10 +30,33 @@ const LoginPage = () => {
             variables: {
               default: {
                 colors: {
-                  brand: 'rgb(var(--primary))',
-                  brandAccent: 'rgb(var(--primary))',
-                }
-              }
+                  brand: '#9b87f5',
+                  brandAccent: '#7E69AB',
+                  brandButtonText: 'white',
+                  defaultButtonBackground: '#2A2F3C',
+                  defaultButtonBackgroundHover: '#1A1F2C',
+                  inputBackground: '#1A1F2C',
+                  inputBorder: '#6E59A5',
+                  inputBorderHover: '#9b87f5',
+                  inputBorderFocus: '#D6BCFA',
+                },
+                borderWidths: {
+                  buttonBorderWidth: '0px',
+                  inputBorderWidth: '1px',
+                },
+                radii: {
+                  borderRadiusButton: '8px',
+                  buttonBorderRadius: '8px',
+                  inputBorderRadius: '8px',
+                },
+              },
+            },
+            className: {
+              container: 'space-y-4',
+              button: 'w-full px-4 py-2.5 rounded-lg font-medium transition-colors duration-200',
+              input: 'w-full px-4 py-2.5 rounded-lg bg-[#1A1F2C] border border-[#6E59A5] focus:border-[#9b87f5] focus:ring-2 focus:ring-[#D6BCFA]/20 transition-colors duration-200',
+              label: 'text-sm font-medium text-[#D6BCFA]',
+              anchor: 'text-[#9b87f5] hover:text-[#D6BCFA] transition-colors duration-200',
             },
           }}
           localization={{
