@@ -39,6 +39,7 @@ const LoginPage = () => {
                   inputBorder: '#6E59A5',
                   inputBorderHover: '#9b87f5',
                   inputBorderFocus: '#D6BCFA',
+                  inputText: 'white',
                 },
                 borderWidths: {
                   buttonBorderWidth: '0px',
@@ -54,7 +55,7 @@ const LoginPage = () => {
             className: {
               container: 'space-y-4',
               button: 'w-full px-4 py-2.5 rounded-lg font-medium transition-colors duration-200',
-              input: 'w-full px-4 py-2.5 rounded-lg bg-[#1A1F2C] border border-[#6E59A5] focus:border-[#9b87f5] focus:ring-2 focus:ring-[#D6BCFA]/20 transition-colors duration-200',
+              input: 'w-full px-4 py-2.5 rounded-lg bg-[#1A1F2C] border border-[#6E59A5] focus:border-[#9b87f5] focus:ring-2 focus:ring-[#D6BCFA]/20 transition-colors duration-200 text-white placeholder:text-gray-400',
               label: 'text-sm font-medium text-[#D6BCFA]',
               anchor: 'text-[#9b87f5] hover:text-[#D6BCFA] transition-colors duration-200',
             },
