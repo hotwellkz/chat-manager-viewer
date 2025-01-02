@@ -11,30 +11,26 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Настройка CORS
 app.use(cors());
 app.use(express.json());
 
-// Создаем клиент OpenAI
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-// Папка для хранения файлов
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir);
 }
 
-// Маршрут для обработки промта
 app.post('/api/prompt', async (req, res) => {
   try {
     const { prompt, framework } = req.body;
 
-    // Отправляем запрос в OpenAI
+    // Формируем системный промт для получения структурированного ответа
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4",
       messages: [
         {
           role: "system",
@@ -44,6 +40,7 @@ app.post('/api/prompt', async (req, res) => {
       ],
     });
 
+    // Парсим ответ от OpenAI
     const response = JSON.parse(completion.choices[0].message.content);
 
     // Если есть файлы для сохранения, сохраняем их
@@ -67,7 +64,6 @@ app.post('/api/prompt', async (req, res) => {
   }
 });
 
-// Маршрут для работы с файлами
 app.post('/api/files', async (req, res) => {
   try {
     const { files } = req.body;
@@ -96,7 +92,6 @@ app.post('/api/files', async (req, res) => {
   }
 });
 
-// Статический маршрут для доступа к загруженным файлам
 app.use('/uploads', express.static(uploadsDir));
 
 app.listen(port, () => {
