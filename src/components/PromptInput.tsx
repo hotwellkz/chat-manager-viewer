@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Send } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -54,7 +55,8 @@ export const PromptInput = () => {
       const enhancedPrompt = `${frameworkInstructions}${prompt}`;
 
       // Отправляем запрос на бэкенд
-      const response = await fetch(`${process.env.VITE_BACKEND_URL || 'https://backendlovable006.onrender.com'}/api/prompt`, {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://backendlovable006.onrender.com';
+      const response = await fetch(`${backendUrl}/api/prompt`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -106,15 +108,20 @@ export const PromptInput = () => {
             </SelectContent>
           </Select>
         </div>
-        <Textarea
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Введите ваш запрос..."
-          className="min-h-[100px]"
-        />
-        <div className="flex justify-end">
-          <Button type="submit" disabled={isLoading}>
-            {isLoading ? "Обработка..." : "Отправить"}
+        <div className="relative">
+          <Textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="Введите ваш запрос..."
+            className="min-h-[100px] pr-12"
+          />
+          <Button 
+            type="submit" 
+            disabled={isLoading}
+            size="icon"
+            className="absolute bottom-2 right-2"
+          >
+            <Send className="h-4 w-4" />
           </Button>
         </div>
       </form>
