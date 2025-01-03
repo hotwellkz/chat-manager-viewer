@@ -16,6 +16,7 @@ export const Preview = () => {
   const [files, setFiles] = useState<FilesTable['Row'][]>([]);
   const [selectedFile, setSelectedFile] = useState<FilesTable['Row'] | null>(null);
   const [deploymentUrl, setDeploymentUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
     fetchFiles();
@@ -23,39 +24,51 @@ export const Preview = () => {
   }, []);
 
   const fetchFiles = async () => {
-    const { data, error } = await supabase
-      .from('files')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
-    if (error) {
-      console.error('Error fetching files:', error);
-      return;
-    }
-
-    if (data) {
-      setFiles(data);
-      if (data.length > 0) {
-        setSelectedFile(data[0]);
+    try {
+      const { data, error } = await supabase
+        .from('files')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Error fetching files:', error);
+        return;
       }
+
+      if (data) {
+        setFiles(data);
+        if (data.length > 0) {
+          setSelectedFile(data[0]);
+        }
+      }
+    } catch (err) {
+      console.error('Error in fetchFiles:', err);
     }
   };
 
   const fetchLatestDeployment = async () => {
-    const { data, error } = await supabase
-      .from('deployed_projects')
-      .select('*')
-      .order('last_deployment', { ascending: false })
-      .limit(1)
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('deployed_projects')
+        .select('*')
+        .order('last_deployment', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    if (error) {
-      console.error('Error fetching deployment:', error);
-      return;
-    }
+      if (error) {
+        console.error('Error fetching deployment:', error);
+        setError('Ошибка при получении данных о развертывании');
+        return;
+      }
 
-    if (data && data.project_url) {
-      setDeploymentUrl(data.project_url);
+      if (data && data.project_url) {
+        setDeploymentUrl(data.project_url);
+      } else {
+        setDeploymentUrl(null);
+      }
+    } catch (err) {
+      console.error('Error in fetchLatestDeployment:', err);
+      setError('Произошла ошибка при получении данных о развертывании');
     }
   };
   
@@ -87,14 +100,18 @@ export const Preview = () => {
   return (
     <div className="h-full flex flex-col border-l border-border">
       <div className="p-2 border-b border-border flex justify-between items-center">
-        <a 
-          href={deploymentUrl || '#'} 
-          target="_blank" 
-          rel="noopener noreferrer"
-          className="text-sm text-muted-foreground hover:text-foreground"
-        >
-          {deploymentUrl || 'Waiting for deployment...'}
-        </a>
+        {error ? (
+          <span className="text-sm text-red-500">{error}</span>
+        ) : (
+          <a 
+            href={deploymentUrl || '#'} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-sm text-muted-foreground hover:text-foreground"
+          >
+            {deploymentUrl || 'Ожидание развертывания...'}
+          </a>
+        )}
         <div className="flex gap-2">
           <Button variant="ghost" size="icon" onClick={toggleView}>
             {showCode ? <Eye className="h-4 w-4" /> : <Code className="h-4 w-4" />}
@@ -113,17 +130,21 @@ export const Preview = () => {
       <div className="flex-1 bg-background">
         {showCode ? (
           <div className="h-full">
-            {selectedFile && (
+            {selectedFile ? (
               <Editor
                 height="100%"
                 defaultLanguage="typescript"
-                value={selectedFile.content || '// No content'}
+                value={selectedFile.content || '// Нет содержимого'}
                 options={{
                   readOnly: true,
                   minimap: { enabled: false },
                   fontSize: 14,
                 }}
               />
+            ) : (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                Выберите файл для просмотра
+              </div>
             )}
           </div>
         ) : (
