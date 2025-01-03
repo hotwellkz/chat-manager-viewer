@@ -23,12 +23,30 @@ export const PromptInput = () => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ 
+          prompt,
+          userId: user.id 
+        }),
       });
 
-      if (!response.ok) throw new Error("Ошибка при обработке запроса");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Ошибка при обработке запроса");
+      }
       
       const data = await response.json();
+
+      // Сохраняем сообщение в историю чата
+      await supabase
+        .from('chat_history')
+        .insert([
+          {
+            user_id: user.id,
+            prompt: prompt,
+            response: JSON.stringify(data),
+            is_ai: false
+          }
+        ]);
 
       toast({
         title: "Успешно!",
