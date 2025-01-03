@@ -3,10 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Send, FilePlus } from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 export const PromptInput = () => {
   const [prompt, setPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [framework, setFramework] = useState("react");
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -18,13 +21,12 @@ export const PromptInput = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Пользователь не авторизован");
 
-      // Используем URL бэкенда на Render
-      const response = await fetch("https://backendlovable006.onrender.com/api/prompt", {
+      const response = await fetch(`${process.env.VITE_BACKEND_URL || 'http://localhost:3000'}/api/prompt`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ prompt, framework }),
       });
 
       if (!response.ok) throw new Error("Ошибка при обработке запроса");
@@ -49,19 +51,56 @@ export const PromptInput = () => {
     }
   };
 
+  const handleFileUpload = () => {
+    toast({
+      title: "Загрузка файлов",
+      description: "Функция загрузки файлов будет доступна в ближайшее время",
+    });
+  };
+
   return (
     <div className="p-4 border-t">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Textarea
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Введите ваш запрос..."
-          className="min-h-[100px]"
-        />
-        <div className="flex justify-end">
-          <Button type="submit" disabled={isLoading}>
-            {isLoading ? "Обработка..." : "Отправить"}
-          </Button>
+        <div className="flex items-center gap-2 mb-4">
+          <ToggleGroup type="single" value={framework} onValueChange={(value) => value && setFramework(value)}>
+            <ToggleGroupItem value="nodejs" aria-label="Node.js">
+              Node.js
+            </ToggleGroupItem>
+            <ToggleGroupItem value="react" aria-label="React">
+              React
+            </ToggleGroupItem>
+            <ToggleGroupItem value="vue" aria-label="Vue">
+              Vue
+            </ToggleGroupItem>
+          </ToggleGroup>
+        </div>
+        <div className="relative">
+          <Textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="Введите ваш запрос..."
+            className="min-h-[100px] pr-24"
+          />
+          <div className="absolute bottom-2 right-2 flex gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={handleFileUpload}
+              className="h-8 w-8"
+            >
+              <FilePlus className="h-4 w-4" />
+            </Button>
+            <Button
+              type="submit"
+              variant="ghost"
+              size="icon"
+              disabled={isLoading}
+              className="h-8 w-8"
+            >
+              <Send className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </form>
     </div>
