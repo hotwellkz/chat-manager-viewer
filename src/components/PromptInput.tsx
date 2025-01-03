@@ -9,69 +9,63 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 export const PromptInput = () => {
   const [prompt, setPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [framework, setFramework] = useState("react");
+  const [framework, setFramework] = useState("react"); // react по умолчанию
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!prompt.trim()) return;
+    if (!prompt.trim()) {
+      toast({
+        title: "Ошибка",
+        description: "Введите текст запроса",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Пользователь не авторизован");
 
-      // Сохраняем промпт в историю чата
+      // Сначала сохраняем сообщение пользователя в chat_history
       const { error: chatError } = await supabase
         .from('chat_history')
         .insert({
           user_id: user.id,
-          prompt: prompt,
+          prompt: prompt.trim(),
           is_ai: false
         });
 
       if (chatError) throw chatError;
 
-      // Отправляем промпт на бэкенд
+      // Отправляем запрос на бэкенд
       const response = await fetch(`https://backendlovable006.onrender.com/api/prompt`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ prompt, framework }),
+        body: JSON.stringify({ 
+          prompt: prompt.trim(),
+          framework 
+        }),
       });
 
       if (!response.ok) throw new Error("Ошибка при обработке запроса");
       
       const data = await response.json();
 
-      // Сохраняем ответ ИИ в историю чата
-      const { error: aiResponseError } = await supabase
+      // Сохраняем ответ ИИ в chat_history
+      const { error: aiChatError } = await supabase
         .from('chat_history')
         .insert({
           user_id: user.id,
-          prompt: data.response,
-          is_ai: true
+          prompt: data.description || "Получен ответ от ИИ",
+          is_ai: true,
+          response: JSON.stringify(data)
         });
 
-      if (aiResponseError) throw aiResponseError;
-
-      // Если есть файлы для создания, сохраняем их
-      if (data.files && data.files.length > 0) {
-        for (const file of data.files) {
-          const { error: fileError } = await supabase
-            .from('files')
-            .insert({
-              user_id: user.id,
-              filename: file.path.split('/').pop(),
-              file_path: file.path,
-              content_type: 'text/plain',
-              size: file.content.length
-            });
-
-          if (fileError) throw fileError;
-        }
-      }
+      if (aiChatError) throw aiChatError;
 
       toast({
         title: "Успешно!",
@@ -102,17 +96,32 @@ export const PromptInput = () => {
             className="min-h-[100px] pr-24"
           />
           <div className="absolute bottom-2 right-2 flex items-center gap-2">
-            <Button type="button" variant="ghost" size="icon" disabled={isLoading}>
+            <Button 
+              type="button" 
+              size="icon" 
+              variant="ghost"
+              disabled={isLoading}
+            >
               <FilePlus className="h-4 w-4" />
             </Button>
-            <Button type="submit" variant="ghost" size="icon" disabled={isLoading}>
+            <Button 
+              type="submit" 
+              size="icon"
+              disabled={isLoading}
+            >
               <Send className="h-4 w-4" />
             </Button>
           </div>
         </div>
-        <div className="flex justify-end">
-          <ToggleGroup type="single" value={framework} onValueChange={(value) => value && setFramework(value)}>
-            <ToggleGroupItem value="nodejs" aria-label="Node.js">
+        <div className="flex justify-between items-center">
+          <ToggleGroup 
+            type="single" 
+            value={framework}
+            onValueChange={(value) => {
+              if (value) setFramework(value);
+            }}
+          >
+            <ToggleGroupItem value="node" aria-label="Node.js">
               Node.js
             </ToggleGroupItem>
             <ToggleGroupItem value="react" aria-label="React">
