@@ -9,7 +9,7 @@ import { Paperclip, Send } from "lucide-react";
 export const PromptInput = () => {
   const [prompt, setPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [framework, setFramework] = useState("react");
+  const [framework, setFramework] = useState("");
   const { toast } = useToast();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -22,6 +22,41 @@ export const PromptInput = () => {
     }
   };
 
+  const getFrameworkPrompt = (userPrompt: string, selectedFramework: string) => {
+    if (!selectedFramework) return userPrompt;
+
+    const frameworkInstructions = {
+      React: `Создай полноценное React приложение со следующими требованиями:
+      1. Используй современные практики React разработки
+      2. Добавь необходимые зависимости и конфигурационные файлы
+      3. Структурируй код по компонентам
+      4. Добавь базовую маршрутизацию
+      5. Используй TypeScript
+      6. Добавь стилизацию через CSS модули или Tailwind
+      7. Реализуй следующую функциональность: ${userPrompt}`,
+      
+      "Node.js": `Создай полноценное Node.js приложение со следующими требованиями:
+      1. Используй Express.js для создания сервера
+      2. Добавь необходимые middleware и конфигурационные файлы
+      3. Структурируй код по MVC паттерну
+      4. Добавь обработку ошибок и логирование
+      5. Настрой работу с базой данных
+      6. Добавь базовую аутентификацию
+      7. Реализуй следующую функциональность: ${userPrompt}`,
+      
+      Vue: `Создай полноценное Vue.js приложение со следующими требованиями:
+      1. Используй Vue 3 Composition API
+      2. Добавь необходимые зависимости и конфигурационные файлы
+      3. Структурируй код по компонентам
+      4. Добавь Vue Router для маршрутизации
+      5. Используй TypeScript
+      6. Добавь Pinia для управления состоянием
+      7. Реализуй следующую функциональность: ${userPrompt}`
+    };
+
+    return frameworkInstructions[selectedFramework as keyof typeof frameworkInstructions] || userPrompt;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim()) return;
@@ -31,28 +66,25 @@ export const PromptInput = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Пользователь не авторизован");
 
-      console.log("Отправка запроса на:", "https://backendlovable006.onrender.com/api/prompt");
-      
-      const response = await fetch("https://backendlovable006.onrender.com/api/prompt", {
+      const finalPrompt = getFrameworkPrompt(prompt, framework);
+
+      const response = await fetch('https://backendlovable006.onrender.com/api/prompt', {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ 
-          prompt,
-          framework,
-          userId: user.id 
+          prompt: finalPrompt,
+          framework 
         }),
       });
 
       if (!response.ok) {
-        const errorData = await response.text();
-        console.error("Ошибка ответа:", errorData);
-        throw new Error(`Ошибка при обработке запроса: ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`Ошибка при обработке запроса: ${errorText}`);
       }
       
       const data = await response.json();
-      console.log("Ответ сервера:", data);
 
       toast({
         title: "Успешно!",
@@ -75,15 +107,15 @@ export const PromptInput = () => {
   return (
     <div className="p-4 border-t">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="flex gap-2 items-center mb-2">
+        <div className="flex gap-4 items-center mb-4">
           <Select value={framework} onValueChange={setFramework}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Выберите фреймворк" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="nodejs">Node.js</SelectItem>
-              <SelectItem value="react">React</SelectItem>
-              <SelectItem value="vue">Vue</SelectItem>
+              <SelectItem value="React">React</SelectItem>
+              <SelectItem value="Node.js">Node.js</SelectItem>
+              <SelectItem value="Vue">Vue</SelectItem>
             </SelectContent>
           </Select>
           <label className="cursor-pointer">
@@ -105,7 +137,7 @@ export const PromptInput = () => {
           <button
             type="submit"
             disabled={isLoading}
-            className="absolute bottom-3 right-3 p-2 text-gray-500 hover:text-gray-700 disabled:opacity-50"
+            className="absolute right-3 bottom-3 p-2 text-gray-500 hover:text-gray-700 disabled:opacity-50"
           >
             <Send className="h-5 w-5" />
           </button>
