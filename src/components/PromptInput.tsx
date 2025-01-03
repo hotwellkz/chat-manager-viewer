@@ -12,14 +12,14 @@ export const PromptInput = () => {
   const [framework, setFramework] = useState("react");
   const { toast } = useToast();
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-
-    toast({
-      title: "Файл выбран",
-      description: `${file.name} готов к загрузке`,
-    });
+    if (file) {
+      toast({
+        title: "Файл выбран",
+        description: `Выбран файл: ${file.name}`,
+      });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -31,17 +31,28 @@ export const PromptInput = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Пользователь не авторизован");
 
-      const response = await fetch('https://backendlovable006.onrender.com/api/prompt', {
+      console.log("Отправка запроса на:", "https://backendlovable006.onrender.com/api/prompt");
+      
+      const response = await fetch("https://backendlovable006.onrender.com/api/prompt", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ prompt, framework }),
+        body: JSON.stringify({ 
+          prompt,
+          framework,
+          userId: user.id 
+        }),
       });
 
-      if (!response.ok) throw new Error("Ошибка при обработке запроса");
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error("Ошибка ответа:", errorData);
+        throw new Error(`Ошибка при обработке запроса: ${response.status}`);
+      }
       
       const data = await response.json();
+      console.log("Ответ сервера:", data);
 
       toast({
         title: "Успешно!",
@@ -64,31 +75,25 @@ export const PromptInput = () => {
   return (
     <div className="p-4 border-t">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="flex gap-2 mb-2">
+        <div className="flex gap-2 items-center mb-2">
           <Select value={framework} onValueChange={setFramework}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Выберите фреймворк" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="node">Node.js</SelectItem>
+              <SelectItem value="nodejs">Node.js</SelectItem>
               <SelectItem value="react">React</SelectItem>
               <SelectItem value="vue">Vue</SelectItem>
             </SelectContent>
           </Select>
-          <div className="relative">
+          <label className="cursor-pointer">
             <input
               type="file"
               className="hidden"
-              id="file-upload"
-              onChange={handleFileUpload}
+              onChange={handleFileChange}
             />
-            <label
-              htmlFor="file-upload"
-              className="cursor-pointer inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground ring-offset-background transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              <Paperclip className="h-4 w-4" />
-            </label>
-          </div>
+            <Paperclip className="h-5 w-5 text-gray-500 hover:text-gray-700" />
+          </label>
         </div>
         <div className="relative">
           <Textarea
@@ -97,14 +102,13 @@ export const PromptInput = () => {
             placeholder="Введите ваш запрос..."
             className="min-h-[100px] pr-12"
           />
-          <Button 
-            type="submit" 
+          <button
+            type="submit"
             disabled={isLoading}
-            className="absolute bottom-2 right-2 p-2 h-8 w-8"
-            variant="ghost"
+            className="absolute bottom-3 right-3 p-2 text-gray-500 hover:text-gray-700 disabled:opacity-50"
           >
-            <Send className="h-4 w-4" />
-          </Button>
+            <Send className="h-5 w-5" />
+          </button>
         </div>
       </form>
     </div>
