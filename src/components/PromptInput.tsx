@@ -2,9 +2,9 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Paperclip, Send } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 export const PromptInput = () => {
   const [prompt, setPrompt] = useState("");
@@ -22,7 +22,7 @@ export const PromptInput = () => {
       5. Используй TypeScript
       6. Добавь стилизацию через CSS модули или Tailwind
       7. Реализуй следующую функциональность: ${userPrompt}`,
-      
+
       "Node.js": `Создай полноценное Node.js приложение со следующими требованиями:
       1. Используй Express.js для создания сервера
       2. Добавь необходимые middleware и конфигурационные файлы
@@ -31,7 +31,7 @@ export const PromptInput = () => {
       5. Настрой работу с базой данных
       6. Добавь базовую аутентификацию
       7. Реализуй следующую функциональность: ${userPrompt}`,
-      
+
       Vue: `Создай полноценное Vue.js приложение со следующими требованиями:
       1. Используй Vue 3 Composition API
       2. Добавь необходимые зависимости и конфигурационные файлы
@@ -55,12 +55,19 @@ export const PromptInput = () => {
       if (!user) throw new Error("Пользователь не авторизован");
 
       const finalPrompt = getFrameworkPrompt(prompt, framework);
-      console.log("Отправляем запрос:", {
-        prompt: finalPrompt,
-        userId: user.id,
-        framework
-      });
 
+      // Сохраняем промпт в chat_history
+      const { error: chatError } = await supabase
+        .from('chat_history')
+        .insert({
+          user_id: user.id,
+          prompt: prompt,
+          is_ai: false
+        });
+
+      if (chatError) throw chatError;
+
+      // Отправляем промпт на бэкенд
       const response = await fetch("https://backendlovable006.onrender.com/api/prompt", {
         method: "POST",
         headers: {
@@ -77,8 +84,19 @@ export const PromptInput = () => {
         const errorData = await response.json();
         throw new Error(errorData.error || "Ошибка при обработке запроса");
       }
-      
+
       const data = await response.json();
+
+      // Сохраняем ответ ИИ в chat_history
+      const { error: aiResponseError } = await supabase
+        .from('chat_history')
+        .insert({
+          user_id: user.id,
+          prompt: data.description,
+          is_ai: true
+        });
+
+      if (aiResponseError) throw aiResponseError;
 
       toast({
         title: "Успешно!",
