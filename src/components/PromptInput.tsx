@@ -18,7 +18,7 @@ export const PromptInput = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Пользователь не авторизован");
 
-      const response = await fetch(`https://backendlovable006.onrender.com`, {
+      const response = await fetch(`https://lovable006.netlify.app/api/prompt`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
