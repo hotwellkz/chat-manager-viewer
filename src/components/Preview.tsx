@@ -4,7 +4,7 @@ import {
   Smartphone, 
   RefreshCw 
 } from "lucide-react";
-import { FilesTable } from "@/integrations/supabase/types";
+import { FilesTable } from "@/integrations/supabase/types/tables";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Editor } from "@monaco-editor/react";
@@ -12,8 +12,8 @@ import { Editor } from "@monaco-editor/react";
 export const Preview = () => {
   const previewUrl = "https://lovable006.netlify.app";
   const [showCode, setShowCode] = useState(false);
-  const [files, setFiles] = useState<FilesTable[]>([]);
-  const [selectedFile, setSelectedFile] = useState<FilesTable | null>(null);
+  const [files, setFiles] = useState<FilesTable['Row'][]>([]);
+  const [selectedFile, setSelectedFile] = useState<FilesTable['Row'] | null>(null);
   
   useEffect(() => {
     fetchFiles();
