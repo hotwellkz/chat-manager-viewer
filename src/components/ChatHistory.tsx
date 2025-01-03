@@ -46,16 +46,16 @@ export const ChatHistory = () => {
 
   const setupRealtimeSubscription = () => {
     const channel = supabase
-      .channel('chat_history_changes')
+      .channel('chat_updates')
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
           table: 'chat_history'
         },
-        () => {
-          fetchMessages();
+        (payload) => {
+          setMessages(prev => [...prev, payload.new as ChatMessage]);
         }
       )
       .subscribe();
@@ -63,6 +63,16 @@ export const ChatHistory = () => {
     return () => {
       supabase.removeChannel(channel);
     };
+  };
+
+  const regenerateResponse = async (messageId: string) => {
+    // Здесь будет логика регенерации ответа
+    console.log('Regenerating response for:', messageId);
+  };
+
+  const viewFiles = async (messageId: string) => {
+    // Здесь будет логика просмотра файлов
+    console.log('Viewing files for:', messageId);
   };
 
   return (
@@ -83,14 +93,24 @@ export const ChatHistory = () => {
               }`}
             >
               <p>{message.prompt}</p>
-              <div className="text-xs mt-2 opacity-70">{new Date(message.timestamp).toLocaleString()}</div>
+              <div className="text-xs mt-2 opacity-70">
+                {new Date(message.timestamp).toLocaleString()}
+              </div>
             </div>
             {message.is_ai && (
               <div className="flex gap-2 mt-1">
-                <Button size="icon" variant="ghost">
+                <Button 
+                  size="icon" 
+                  variant="ghost"
+                  onClick={() => regenerateResponse(message.id)}
+                >
                   <RotateCcw className="h-4 w-4" />
                 </Button>
-                <Button size="icon" variant="ghost">
+                <Button 
+                  size="icon" 
+                  variant="ghost"
+                  onClick={() => viewFiles(message.id)}
+                >
                   <Eye className="h-4 w-4" />
                 </Button>
               </div>
