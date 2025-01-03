@@ -3,6 +3,7 @@ import { ScrollArea } from "./ui/scroll-area";
 import { Button } from "./ui/button";
 import { Eye, RotateCcw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "./ui/use-toast";
 
 interface ChatMessage {
   id: string;
@@ -13,30 +14,37 @@ interface ChatMessage {
 
 export const ChatHistory = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const { toast } = useToast();
 
-  useEffect(() => {
-    const fetchMessages = async () => {
+  const fetchMessages = async () => {
+    try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data, error } = await supabase
         .from('chat_history')
         .select('*')
+        .eq('user_id', user.id)
         .order('timestamp', { ascending: true });
 
-      if (error) {
-        console.error("Error fetching messages:", error);
-        return;
-      }
-
+      if (error) throw error;
       setMessages(data || []);
-    };
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось загрузить историю чата",
+        variant: "destructive",
+      });
+    }
+  };
 
+  useEffect(() => {
     fetchMessages();
 
-    // Подписываемся на обновления
+    // Подписываемся на обновления чата
     const channel = supabase
-      .channel('chat_history_changes')
+      .channel('chat_updates')
       .on(
         'postgres_changes',
         {
@@ -73,13 +81,11 @@ export const ChatHistory = () => {
               }`}
             >
               <p>{message.prompt}</p>
-              <div className="text-xs mt-2 opacity-70">
-                {new Date(message.timestamp).toLocaleString()}
-              </div>
+              <div className="text-xs mt-2 opacity-70">{new Date(message.timestamp).toLocaleString()}</div>
             </div>
             {message.is_ai && (
               <div className="flex gap-2 mt-1">
-                <Button size="icon" variant="ghost">
+                <Button size="icon" variant="ghost" onClick={() => fetchMessages()}>
                   <RotateCcw className="h-4 w-4" />
                 </Button>
                 <Button size="icon" variant="ghost">
