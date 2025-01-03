@@ -4,13 +4,22 @@ import path from 'path';
 
 export const handlePrompt = async (req, res) => {
   try {
-    const openai = await initOpenAI();
+    console.log('Получен запрос:', req.body);
     const { prompt, framework, userId } = req.body;
 
     if (!prompt || !framework || !userId) {
+      console.error('Отсутствуют обязательные параметры:', { prompt, framework, userId });
       return res.status(400).json({ error: 'Отсутствуют обязательные параметры' });
     }
 
+    // Инициализируем OpenAI
+    const openai = await initOpenAI();
+    if (!openai) {
+      console.error('Не удалось инициализировать OpenAI');
+      return res.status(500).json({ error: 'Ошибка инициализации OpenAI' });
+    }
+
+    console.log('Сохраняем промпт в историю чата...');
     // Сохраняем промпт в историю чата
     const { error: chatError } = await supabase
       .from('chat_history')
@@ -40,9 +49,10 @@ export const handlePrompt = async (req, res) => {
     }
     systemPrompt += "Always return response in JSON format with fields: files (array of file objects with path and content), description (string with explanation).";
 
+    console.log('Отправляем запрос к OpenAI...');
     // Получаем ответ от OpenAI
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4',
+      model: 'gpt-4o',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: prompt },
@@ -50,13 +60,16 @@ export const handlePrompt = async (req, res) => {
     });
 
     if (!completion.choices || !completion.choices[0] || !completion.choices[0].message) {
+      console.error('Некорректный ответ от OpenAI API');
       throw new Error('Некорректный ответ от OpenAI API');
     }
 
     const response = JSON.parse(completion.choices[0].message.content);
+    console.log('Получен ответ от OpenAI:', response);
 
     // Сохраняем файлы
     if (response.files && response.files.length > 0) {
+      console.log('Сохраняем файлы...');
       for (const file of response.files) {
         const filePath = `${userId}/${file.path}`;
 
@@ -91,6 +104,7 @@ export const handlePrompt = async (req, res) => {
     }
 
     // Сохраняем ответ ИИ в историю чата
+    console.log('Сохраняем ответ ИИ в историю чата...');
     const { error: aiChatError } = await supabase
       .from('chat_history')
       .insert({
@@ -104,6 +118,7 @@ export const handlePrompt = async (req, res) => {
       throw aiChatError;
     }
 
+    console.log('Успешно обработан запрос');
     res.json(response);
   } catch (error) {
     console.error('Error:', error);
