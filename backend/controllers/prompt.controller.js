@@ -12,9 +12,9 @@ const supabase = createClient(
 
 export const handlePrompt = async (req, res) => {
   try {
-    const { prompt, userId } = req.body;
+    const { prompt, framework, userId } = req.body;
 
-    // Сохраняем промт в историю чата
+    // Сохраняем промпт в историю чата
     const { error: chatError } = await supabase
       .from('chat_history')
       .insert({
@@ -25,13 +25,30 @@ export const handlePrompt = async (req, res) => {
 
     if (chatError) throw chatError;
 
+    // Формируем системный промт в зависимости от фреймворка
+    let systemPrompt = "You are a helpful assistant that generates structured responses for code generation. ";
+    
+    switch (framework) {
+      case "react":
+        systemPrompt += "You specialize in creating React applications with TypeScript, React Router, and Tailwind CSS. Create all necessary files for a complete deployable application.";
+        break;
+      case "node":
+        systemPrompt += "You specialize in creating Node.js applications with Express.js, MongoDB/Mongoose, and JWT authentication. Create all necessary files for a complete deployable application.";
+        break;
+      case "vue":
+        systemPrompt += "You specialize in creating Vue.js applications with TypeScript, Vue Router, and Vuex. Create all necessary files for a complete deployable application.";
+        break;
+    }
+    
+    systemPrompt += " Always return response in JSON format with fields: files (array of file objects with path and content), description (string with explanation).";
+
     // Получаем ответ от OpenAI
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4",
       messages: [
         {
           role: "system",
-          content: "You are a helpful assistant that generates structured responses for code generation. Always return response in JSON format with fields: files (array of file objects with path and content), description (string with explanation)."
+          content: systemPrompt
         },
         { role: "user", content: prompt }
       ],
@@ -39,7 +56,7 @@ export const handlePrompt = async (req, res) => {
 
     const response = JSON.parse(completion.choices[0].message.content);
 
-    // Сохраняем файлы в Storage
+    // Сохраняем файлы и запускаем развертывание
     if (response.files && response.files.length > 0) {
       for (const file of response.files) {
         const filePath = `${userId}/${file.path}`;
@@ -68,6 +85,19 @@ export const handlePrompt = async (req, res) => {
 
         if (fileError) throw fileError;
       }
+
+      // Запускаем процесс развертывания
+      await fetch(`${process.env.BACKEND_URL}/api/deploy`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          files: response.files,
+          framework
+        })
+      });
     }
 
     // Сохраняем ответ ИИ в историю чата

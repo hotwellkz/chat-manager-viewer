@@ -3,9 +3,18 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Send } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export const PromptInput = () => {
   const [prompt, setPrompt] = useState("");
+  const [framework, setFramework] = useState("react");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -29,15 +38,33 @@ export const PromptInput = () => {
 
       if (chatError) throw chatError;
 
+      // Формируем расширенный промт в зависимости от фреймворка
+      let frameworkInstructions = "";
+      switch (framework) {
+        case "react":
+          frameworkInstructions = "Создай полноценное React приложение с использованием следующих технологий: React Router для маршрутизации, Tailwind CSS для стилей, TypeScript для типизации. Структура должна включать компоненты, хуки, утилиты и страницы. ";
+          break;
+        case "node":
+          frameworkInstructions = "Создай полноценное Node.js приложение с использованием Express.js для сервера, MongoDB/Mongoose для базы данных, JWT для аутентификации. Структура должна включать роуты, контроллеры, модели и middleware. ";
+          break;
+        case "vue":
+          frameworkInstructions = "Создай полноценное Vue.js приложение с использованием Vue Router для маршрутизации, Vuex для управления состоянием, TypeScript для типизации. Структура должна включать компоненты, хранилище, миксины и страницы. ";
+          break;
+      }
+
+      const enhancedPrompt = `${frameworkInstructions}${prompt}`;
+
       // Отправляем запрос на бэкенд
-      const response = await fetch(`${process.env.VITE_BACKEND_URL || 'https://backendlovable006.onrender.com'}/api/prompt`, {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://backendlovable006.onrender.com';
+      const response = await fetch(`${backendUrl}/api/prompt`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ 
-          prompt,
-          userId: user.id 
+          prompt: enhancedPrompt,
+          userId: user.id,
+          framework
         }),
       });
 
@@ -66,15 +93,35 @@ export const PromptInput = () => {
   return (
     <div className="p-4 border-t">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Textarea
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Введите ваш запрос..."
-          className="min-h-[100px]"
-        />
-        <div className="flex justify-end">
-          <Button type="submit" disabled={isLoading}>
-            {isLoading ? "Обработка..." : "Отправить"}
+        <div className="flex items-center gap-4">
+          <Select
+            value={framework}
+            onValueChange={setFramework}
+          >
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Выберите фреймворк" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="react">React</SelectItem>
+              <SelectItem value="node">Node.js</SelectItem>
+              <SelectItem value="vue">Vue</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="relative">
+          <Textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="Введите ваш запрос..."
+            className="min-h-[100px] pr-12"
+          />
+          <Button 
+            type="submit" 
+            disabled={isLoading}
+            size="icon"
+            className="absolute bottom-2 right-2"
+          >
+            <Send className="h-4 w-4" />
           </Button>
         </div>
       </form>

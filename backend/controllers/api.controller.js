@@ -29,13 +29,30 @@ export const handlePrompt = async (req, res) => {
 
     if (chatError) throw chatError;
 
+    // Формируем системный промт в зависимости от фреймворка
+    let systemPrompt = "You are a helpful assistant that generates structured responses for code generation. ";
+    
+    switch (framework) {
+      case "react":
+        systemPrompt += "You specialize in creating React applications with TypeScript, React Router, and Tailwind CSS. ";
+        break;
+      case "node":
+        systemPrompt += "You specialize in creating Node.js applications with Express.js, MongoDB/Mongoose, and JWT authentication. ";
+        break;
+      case "vue":
+        systemPrompt += "You specialize in creating Vue.js applications with TypeScript, Vue Router, and Vuex. ";
+        break;
+    }
+    
+    systemPrompt += "Always return response in JSON format with fields: files (array of file objects with path and content), description (string with explanation).";
+
     // Получаем ответ от OpenAI
     const completion = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: "gpt-4o",
       messages: [
         {
           role: "system",
-          content: "You are a helpful assistant that generates structured responses for code generation. Always return response in JSON format with fields: files (array of file objects with path and content), description (string with explanation)."
+          content: systemPrompt
         },
         { role: "user", content: prompt }
       ],
