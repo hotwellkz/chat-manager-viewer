@@ -2,7 +2,9 @@ import { Button } from "./ui/button";
 import { 
   Maximize2, 
   Smartphone, 
-  RefreshCw 
+  RefreshCw,
+  Code,
+  Eye
 } from "lucide-react";
 import { FilesTable } from "@/integrations/supabase/types/tables";
 import { useState, useEffect } from "react";
@@ -10,19 +12,21 @@ import { supabase } from "@/integrations/supabase/client";
 import { Editor } from "@monaco-editor/react";
 
 export const Preview = () => {
-  const previewUrl = "https://lovable006.netlify.app";
   const [showCode, setShowCode] = useState(false);
   const [files, setFiles] = useState<FilesTable['Row'][]>([]);
   const [selectedFile, setSelectedFile] = useState<FilesTable['Row'] | null>(null);
+  const [deploymentUrl, setDeploymentUrl] = useState<string | null>(null);
   
   useEffect(() => {
     fetchFiles();
+    fetchLatestDeployment();
   }, []);
 
   const fetchFiles = async () => {
     const { data, error } = await supabase
       .from('files')
-      .select('*');
+      .select('*')
+      .order('created_at', { ascending: false });
     
     if (error) {
       console.error('Error fetching files:', error);
@@ -34,6 +38,24 @@ export const Preview = () => {
       if (data.length > 0) {
         setSelectedFile(data[0]);
       }
+    }
+  };
+
+  const fetchLatestDeployment = async () => {
+    const { data, error } = await supabase
+      .from('deployed_projects')
+      .select('*')
+      .order('last_deployment', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error) {
+      console.error('Error fetching deployment:', error);
+      return;
+    }
+
+    if (data && data.project_url) {
+      setDeploymentUrl(data.project_url);
     }
   };
   
@@ -66,16 +88,16 @@ export const Preview = () => {
     <div className="h-full flex flex-col border-l border-border">
       <div className="p-2 border-b border-border flex justify-between items-center">
         <a 
-          href={previewUrl} 
+          href={deploymentUrl || '#'} 
           target="_blank" 
           rel="noopener noreferrer"
           className="text-sm text-muted-foreground hover:text-foreground"
         >
-          {previewUrl}
+          {deploymentUrl || 'Waiting for deployment...'}
         </a>
         <div className="flex gap-2">
           <Button variant="ghost" size="icon" onClick={toggleView}>
-            {showCode ? 'Preview' : 'Code'}
+            {showCode ? <Eye className="h-4 w-4" /> : <Code className="h-4 w-4" />}
           </Button>
           <Button variant="ghost" size="icon" onClick={handleMobileView}>
             <Smartphone className="h-4 w-4" />
@@ -90,21 +112,23 @@ export const Preview = () => {
       </div>
       <div className="flex-1 bg-background">
         {showCode ? (
-          selectedFile && (
-            <Editor
-              height="100%"
-              defaultLanguage="typescript"
-              defaultValue={selectedFile.content || '// No content'}
-              options={{
-                readOnly: true,
-                minimap: { enabled: false },
-                fontSize: 14,
-              }}
-            />
-          )
+          <div className="h-full">
+            {selectedFile && (
+              <Editor
+                height="100%"
+                defaultLanguage="typescript"
+                value={selectedFile.content || '// No content'}
+                options={{
+                  readOnly: true,
+                  minimap: { enabled: false },
+                  fontSize: 14,
+                }}
+              />
+            )}
+          </div>
         ) : (
           <iframe 
-            src={previewUrl}
+            src={deploymentUrl || 'about:blank'}
             className="w-full h-full border-none"
             title="Preview"
           />
