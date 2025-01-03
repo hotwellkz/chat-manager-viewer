@@ -9,8 +9,66 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      chat_history: {
+        Row: {
+          id: string
+          is_ai: boolean | null
+          prompt: string
+          response: string | null
+          timestamp: string | null
+          user_id: string | null
+        }
+        Insert: {
+          id?: string
+          is_ai?: boolean | null
+          prompt: string
+          response?: string | null
+          timestamp?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          id?: string
+          is_ai?: boolean | null
+          prompt?: string
+          response?: string | null
+          timestamp?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      deployed_projects: {
+        Row: {
+          created_at: string | null
+          framework: string | null
+          id: string
+          last_deployment: string | null
+          project_url: string | null
+          status: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          framework?: string | null
+          id?: string
+          last_deployment?: string | null
+          project_url?: string | null
+          status?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          framework?: string | null
+          id?: string
+          last_deployment?: string | null
+          project_url?: string | null
+          status?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       files: {
         Row: {
+          content: string | null
           content_type: string | null
           created_at: string
           file_path: string
@@ -20,6 +78,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          content?: string | null
           content_type?: string | null
           created_at?: string
           file_path: string
@@ -29,6 +88,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          content?: string | null
           content_type?: string | null
           created_at?: string
           file_path?: string
