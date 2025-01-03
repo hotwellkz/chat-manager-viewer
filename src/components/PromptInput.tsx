@@ -18,13 +18,27 @@ export const PromptInput = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Пользователь не авторизован");
 
-      // Обновляем URL для запроса
-      const response = await fetch(`${process.env.VITE_BACKEND_URL || 'http://localhost:3000'}/api/prompt`, {
+      // Сохраняем промт в chat_history
+      const { error: chatError } = await supabase
+        .from('chat_history')
+        .insert({
+          user_id: user.id,
+          prompt: prompt,
+          is_ai: false
+        });
+
+      if (chatError) throw chatError;
+
+      // Отправляем запрос на бэкенд
+      const response = await fetch(`${process.env.VITE_BACKEND_URL || 'https://backendlovable006.onrender.com'}/api/prompt`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ 
+          prompt,
+          userId: user.id 
+        }),
       });
 
       if (!response.ok) throw new Error("Ошибка при обработке запроса");
