@@ -18,7 +18,7 @@ export const PromptInput = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Пользователь не авторизован");
 
-      const response = await fetch(`https://backendlovable006.onrender.com/api/prompt`, {
+      const response = await fetch(`https://backendlovable006.onrender.com`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
