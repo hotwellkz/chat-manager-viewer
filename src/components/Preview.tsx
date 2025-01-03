@@ -4,7 +4,7 @@ import {
   Smartphone, 
   RefreshCw 
 } from "lucide-react";
-import { FilesTable } from "@/integrations/supabase/types";
+import { FilesTable } from "@/integrations/supabase/types/tables";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Editor } from "@monaco-editor/react";
