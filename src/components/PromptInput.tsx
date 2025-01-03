@@ -21,7 +21,7 @@ export const PromptInput = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Пользователь не авторизован");
 
-      const response = await fetch(`${process.env.VITE_BACKEND_URL || 'http://localhost:3000'}/api/prompt`, {
+      const response = await fetch("https://backendlovable006.onrender.com/api/prompt", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -61,9 +61,14 @@ export const PromptInput = () => {
   return (
     <div className="p-4 border-t">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="flex items-center gap-2 mb-4">
-          <ToggleGroup type="single" value={framework} onValueChange={(value) => value && setFramework(value)}>
-            <ToggleGroupItem value="nodejs" aria-label="Node.js">
+        <div className="mb-4">
+          <ToggleGroup
+            type="single"
+            value={framework}
+            onValueChange={(value) => value && setFramework(value)}
+            className="justify-start"
+          >
+            <ToggleGroupItem value="node" aria-label="Node.js">
               Node.js
             </ToggleGroupItem>
             <ToggleGroupItem value="react" aria-label="React">
@@ -79,7 +84,7 @@ export const PromptInput = () => {
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             placeholder="Введите ваш запрос..."
-            className="min-h-[100px] pr-24"
+            className="min-h-[100px] pr-20"
           />
           <div className="absolute bottom-2 right-2 flex gap-2">
             <Button
