@@ -18,7 +18,6 @@ export const PromptInput = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Пользователь не авторизован");
 
-      // Используем правильный URL бэкенда
       const response = await fetch(`https://backendlovable006.onrender.com`, {
         method: "POST",
         headers: {
