@@ -3,57 +3,51 @@ import { ScrollArea } from "./ui/scroll-area";
 import { Button } from "./ui/button";
 import { Eye, RotateCcw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "./ui/use-toast";
 
 interface ChatMessage {
   id: string;
   prompt: string;
+  response: string | null;
   timestamp: string;
   is_ai: boolean;
 }
 
 export const ChatHistory = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const { toast } = useToast();
-
-  const fetchMessages = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data, error } = await supabase
-        .from('chat_history')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('timestamp', { ascending: true });
-
-      if (error) throw error;
-      setMessages(data || []);
-    } catch (error) {
-      console.error('Error fetching messages:', error);
-      toast({
-        title: "Ошибка",
-        description: "Не удалось загрузить историю чата",
-        variant: "destructive",
-      });
-    }
-  };
 
   useEffect(() => {
+    // Загрузка начальных сообщений
+    const fetchMessages = async () => {
+      const { data, error } = await supabase
+        .from("chat_history")
+        .select("*")
+        .order("timestamp", { ascending: true });
+
+      if (error) {
+        console.error("Error fetching messages:", error);
+        return;
+      }
+
+      if (data) {
+        setMessages(data as ChatMessage[]);
+      }
+    };
+
     fetchMessages();
 
-    // Подписываемся на обновления чата
+    // Подписка на новые сообщения
     const channel = supabase
-      .channel('chat_updates')
+      .channel("schema-db-changes")
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'chat_history'
+          event: "INSERT",
+          schema: "public",
+          table: "chat_history",
         },
         (payload) => {
-          setMessages(prev => [...prev, payload.new as ChatMessage]);
+          const newMessage = payload.new as ChatMessage;
+          setMessages((currentMessages) => [...currentMessages, newMessage]);
         }
       )
       .subscribe();
@@ -80,12 +74,12 @@ export const ChatHistory = () => {
                   : "bg-primary text-primary-foreground"
               }`}
             >
-              <p>{message.prompt}</p>
-              <div className="text-xs mt-2 opacity-70">{new Date(message.timestamp).toLocaleString()}</div>
+              <p>{message.is_ai ? message.response : message.prompt}</p>
+              <div className="text-xs mt-2 opacity-70">{message.timestamp}</div>
             </div>
             {message.is_ai && (
               <div className="flex gap-2 mt-1">
-                <Button size="icon" variant="ghost" onClick={() => fetchMessages()}>
+                <Button size="icon" variant="ghost">
                   <RotateCcw className="h-4 w-4" />
                 </Button>
                 <Button size="icon" variant="ghost">
