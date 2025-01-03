@@ -1,9 +1,5 @@
-import OpenAI from 'openai';
 import { createClient } from '@supabase/supabase-js';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+import { initOpenAI } from '../utils/openai.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -12,7 +8,12 @@ const supabase = createClient(
 
 export const handlePrompt = async (req, res) => {
   try {
+    const openai = await initOpenAI();
     const { prompt, framework, userId } = req.body;
+
+    if (!prompt || !framework || !userId) {
+      return res.status(400).json({ error: 'Отсутствуют обязательные параметры' });
+    }
 
     // Сохраняем промпт в историю чата
     const { error: chatError } = await supabase
@@ -23,24 +24,27 @@ export const handlePrompt = async (req, res) => {
         is_ai: false
       });
 
-    if (chatError) throw chatError;
+    if (chatError) {
+      console.error('Ошибка при сохранении в chat_history:', chatError);
+      throw chatError;
+    }
 
     // Формируем системный промт в зависимости от фреймворка
     let systemPrompt = "You are a helpful assistant that generates structured responses for code generation. ";
     
     switch (framework) {
       case "react":
-        systemPrompt += "You specialize in creating React applications with TypeScript, React Router, and Tailwind CSS. Create all necessary files for a complete deployable application.";
+        systemPrompt += "You specialize in creating React applications with TypeScript, React Router, and Tailwind CSS. ";
         break;
       case "node":
-        systemPrompt += "You specialize in creating Node.js applications with Express.js, MongoDB/Mongoose, and JWT authentication. Create all necessary files for a complete deployable application.";
+        systemPrompt += "You specialize in creating Node.js applications with Express.js, MongoDB/Mongoose, and JWT authentication. ";
         break;
       case "vue":
-        systemPrompt += "You specialize in creating Vue.js applications with TypeScript, Vue Router, and Vuex. Create all necessary files for a complete deployable application.";
+        systemPrompt += "You specialize in creating Vue.js applications with TypeScript, Vue Router, and Vuex. ";
         break;
     }
     
-    systemPrompt += " Always return response in JSON format with fields: files (array of file objects with path and content), description (string with explanation).";
+    systemPrompt += "Always return response in JSON format with fields: files (array of file objects with path and content), description (string with explanation).";
 
     // Получаем ответ от OpenAI
     const completion = await openai.chat.completions.create({
@@ -54,51 +58,11 @@ export const handlePrompt = async (req, res) => {
       ],
     });
 
-    const response = JSON.parse(completion.choices[0].message.content);
-
-    // Сохраняем файлы и запускаем развертывание
-    if (response.files && response.files.length > 0) {
-      for (const file of response.files) {
-        const filePath = `${userId}/${file.path}`;
-        
-        // Загружаем файл в Storage
-        const { error: uploadError } = await supabase.storage
-          .from('project_files')
-          .upload(filePath, file.content, {
-            contentType: 'text/plain',
-            upsert: true
-          });
-
-        if (uploadError) throw uploadError;
-
-        // Сохраняем метаданные файла
-        const { error: fileError } = await supabase
-          .from('files')
-          .insert({
-            user_id: userId,
-            filename: file.path.split('/').pop(),
-            file_path: filePath,
-            content_type: 'text/plain',
-            size: Buffer.byteLength(file.content, 'utf8'),
-            content: file.content
-          });
-
-        if (fileError) throw fileError;
-      }
-
-      // Запускаем процесс развертывания
-      await fetch(`${process.env.BACKEND_URL}/api/deploy`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId,
-          files: response.files,
-          framework
-        })
-      });
+    if (!completion.choices || !completion.choices[0] || !completion.choices[0].message) {
+      throw new Error('Некорректный ответ от OpenAI API');
     }
+
+    const response = JSON.parse(completion.choices[0].message.content);
 
     // Сохраняем ответ ИИ в историю чата
     const { error: aiChatError } = await supabase
@@ -109,11 +73,17 @@ export const handlePrompt = async (req, res) => {
         is_ai: true
       });
 
-    if (aiChatError) throw aiChatError;
+    if (aiChatError) {
+      console.error('Ошибка при сохранении ответа ИИ в chat_history:', aiChatError);
+      throw aiChatError;
+    }
 
     res.json(response);
   } catch (error) {
     console.error('Error:', error);
-    res.status(500).json({ error: 'Failed to process prompt' });
+    res.status(500).json({ 
+      error: 'Ошибка при обработке запроса',
+      details: error.message 
+    });
   }
 };
