@@ -3,11 +3,24 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Paperclip, Send } from "lucide-react";
 
 export const PromptInput = () => {
   const [prompt, setPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [framework, setFramework] = useState("react");
   const { toast } = useToast();
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    toast({
+      title: "Файл выбран",
+      description: `${file.name} готов к загрузке`,
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,30 +36,12 @@ export const PromptInput = () => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ 
-          prompt,
-          userId: user.id 
-        }),
+        body: JSON.stringify({ prompt, framework }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Ошибка при обработке запроса");
-      }
+      if (!response.ok) throw new Error("Ошибка при обработке запроса");
       
       const data = await response.json();
-
-      // Сохраняем сообщение в историю чата
-      await supabase
-        .from('chat_history')
-        .insert([
-          {
-            user_id: user.id,
-            prompt: prompt,
-            response: JSON.stringify(data),
-            is_ai: false
-          }
-        ]);
 
       toast({
         title: "Успешно!",
@@ -69,15 +64,46 @@ export const PromptInput = () => {
   return (
     <div className="p-4 border-t">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Textarea
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Введите ваш запрос..."
-          className="min-h-[100px]"
-        />
-        <div className="flex justify-end">
-          <Button type="submit" disabled={isLoading}>
-            {isLoading ? "Обработка..." : "Отправить"}
+        <div className="flex gap-2 mb-2">
+          <Select value={framework} onValueChange={setFramework}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Выберите фреймворк" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="node">Node.js</SelectItem>
+              <SelectItem value="react">React</SelectItem>
+              <SelectItem value="vue">Vue</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="relative">
+            <input
+              type="file"
+              className="hidden"
+              id="file-upload"
+              onChange={handleFileUpload}
+            />
+            <label
+              htmlFor="file-upload"
+              className="cursor-pointer inline-flex h-10 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground ring-offset-background transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <Paperclip className="h-4 w-4" />
+            </label>
+          </div>
+        </div>
+        <div className="relative">
+          <Textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="Введите ваш запрос..."
+            className="min-h-[100px] pr-12"
+          />
+          <Button 
+            type="submit" 
+            disabled={isLoading}
+            className="absolute bottom-2 right-2 p-2 h-8 w-8"
+            variant="ghost"
+          >
+            <Send className="h-4 w-4" />
           </Button>
         </div>
       </form>
