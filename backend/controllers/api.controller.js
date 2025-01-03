@@ -5,21 +5,34 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-if (!process.env.OPENAI_API_KEY) {
-  console.error('OPENAI_API_KEY не установлен в переменных окружения');
-}
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
-
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+// Функция для получения API ключа из Supabase
+const getOpenAIKey = async () => {
+  const { data, error } = await supabase
+    .from('secrets')
+    .select('value')
+    .eq('name', 'OPENAI_API_KEY')
+    .single();
+
+  if (error) throw new Error('Не удалось получить API ключ OpenAI');
+  return data.value;
+};
+
+// Инициализация OpenAI с ключом из Supabase
+let openai = null;
+const initOpenAI = async () => {
+  const apiKey = await getOpenAIKey();
+  openai = new OpenAI({ apiKey });
+};
+
 export const handlePrompt = async (req, res) => {
   try {
+    if (!openai) await initOpenAI();
+    
     const { prompt, framework, userId } = req.body;
 
     if (!prompt || !framework || !userId) {
@@ -59,7 +72,7 @@ export const handlePrompt = async (req, res) => {
 
     // Получаем ответ от OpenAI
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini", // Исправлено на правильную модель
+      model: "gpt-4",
       messages: [
         {
           role: "system",
