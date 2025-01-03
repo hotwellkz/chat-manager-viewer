@@ -12,19 +12,7 @@ export const PromptInput = () => {
   const [framework, setFramework] = useState("");
   const { toast } = useToast();
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      toast({
-        title: "Файл выбран",
-        description: `Выбран файл: ${file.name}`,
-      });
-    }
-  };
-
-  const getFrameworkPrompt = (userPrompt: string, selectedFramework: string) => {
-    if (!selectedFramework) return userPrompt;
-
+  const getFrameworkPrompt = (userPrompt, selectedFramework) => {
     const frameworkInstructions = {
       React: `Создай полноценное React приложение со следующими требованиями:
       1. Используй современные практики React разработки
@@ -54,10 +42,10 @@ export const PromptInput = () => {
       7. Реализуй следующую функциональность: ${userPrompt}`
     };
 
-    return frameworkInstructions[selectedFramework as keyof typeof frameworkInstructions] || userPrompt;
+    return frameworkInstructions[selectedFramework] || userPrompt;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!prompt.trim()) return;
 
@@ -67,21 +55,27 @@ export const PromptInput = () => {
       if (!user) throw new Error("Пользователь не авторизован");
 
       const finalPrompt = getFrameworkPrompt(prompt, framework);
+      console.log("Отправляем запрос:", {
+        prompt: finalPrompt,
+        userId: user.id,
+        framework
+      });
 
-      const response = await fetch('https://backendlovable006.onrender.com/api/prompt', {
+      const response = await fetch("https://backendlovable006.onrender.com/api/prompt", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           prompt: finalPrompt,
-          framework 
+          userId: user.id,
+          framework
         }),
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Ошибка при обработке запроса: ${errorText}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Ошибка при обработке запроса");
       }
       
       const data = await response.json();
@@ -101,6 +95,16 @@ export const PromptInput = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      toast({
+        title: "Файл выбран",
+        description: `Выбран файл: ${file.name}`,
+      });
     }
   };
 
