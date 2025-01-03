@@ -1,16 +1,10 @@
 import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
-import { 
-  PanelLeftClose, 
-  MessageSquare, 
-  History, 
-  LogIn,
-  LogOut,
-  Settings2
-} from "lucide-react";
+import { PanelLeftClose, MessageSquare, History, LogIn, LogOut, Settings2, Eye, RotateCcw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "./ui/use-toast";
+import { ScrollArea } from "./ui/scroll-area";
 import {
   Sheet,
   SheetContent,
@@ -32,10 +26,18 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+interface ChatMessage {
+  id: string;
+  content: string;
+  timestamp: string;
+  isAI: boolean;
+}
+
 export const Header = () => {
   const [isPanelOpen, setIsPanelOpen] = useState(true);
   const [isChatView, setIsChatView] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -45,6 +47,50 @@ export const Header = () => {
     });
 
     return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const fetchChatHistory = async () => {
+      const { data: chatHistory, error } = await supabase
+        .from("chat_history")
+        .select("*")
+        .order("timestamp", { ascending: true });
+
+      if (error) {
+        console.error("Error fetching chat history:", error);
+        return;
+      }
+
+      const formattedMessages = chatHistory.map((msg) => ({
+        id: msg.id,
+        content: msg.is_ai ? msg.response : msg.prompt,
+        timestamp: new Date(msg.timestamp).toLocaleString(),
+        isAI: msg.is_ai,
+      }));
+
+      setMessages(formattedMessages);
+    };
+
+    fetchChatHistory();
+
+    const subscription = supabase
+      .channel("chat_history_changes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "chat_history",
+        },
+        () => {
+          fetchChatHistory();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleAuthClick = async () => {
@@ -67,59 +113,6 @@ export const Header = () => {
     }
   };
 
-  const handleDeleteProject = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Удаляем файлы из storage
-      const { data: files, error: filesError } = await supabase
-        .storage
-        .from('project_files')
-        .list(`${user.id}`);
-
-      if (filesError) throw filesError;
-
-      if (files && files.length > 0) {
-        const filePaths = files.map(file => `${user.id}/${file.name}`);
-        const { error: deleteError } = await supabase
-          .storage
-          .from('project_files')
-          .remove(filePaths);
-
-        if (deleteError) throw deleteError;
-      }
-
-      // Удаляем записи из chat_history
-      const { error: chatError } = await supabase
-        .from('chat_history')
-        .delete()
-        .eq('user_id', user.id);
-
-      if (chatError) throw chatError;
-
-      // Удаляем записи из files
-      const { error: filesDbError } = await supabase
-        .from('files')
-        .delete()
-        .eq('user_id', user.id);
-
-      if (filesDbError) throw filesDbError;
-
-      toast({
-        title: "Проект удален",
-        description: "Все данные проекта были успешно удалены",
-      });
-    } catch (error) {
-      console.error('Error deleting project:', error);
-      toast({
-        title: "Ошибка",
-        description: "Не удалось удалить проект",
-        variant: "destructive",
-      });
-    }
-  };
-
   return (
     <header className="h-12 bg-editor-background border-b border-border flex items-center justify-between px-4">
       <div className="flex items-center space-x-4">
@@ -128,12 +121,12 @@ export const Header = () => {
           size="icon"
           onClick={() => setIsPanelOpen(!isPanelOpen)}
         >
-          <PanelLeftClose className={`h-5 w-5 transition-transform ${isPanelOpen ? '' : 'rotate-180'}`} />
+          <PanelLeftClose className={`h-5 w-5 transition-transform ${isPanelOpen ? "" : "rotate-180"}`} />
         </Button>
         <Button
           variant="ghost"
           size="icon"
-          className={isChatView ? 'bg-accent' : ''}
+          className={isChatView ? "bg-accent" : ""}
           onClick={() => setIsChatView(true)}
         >
           <MessageSquare className="h-5 w-5" />
@@ -141,15 +134,15 @@ export const Header = () => {
         <Button
           variant="ghost"
           size="icon"
-          className={!isChatView ? 'bg-accent' : ''}
+          className={!isChatView ? "bg-accent" : ""}
           onClick={() => setIsChatView(false)}
         >
           <History className="h-5 w-5" />
         </Button>
       </div>
-      
+
       <h1 className="text-lg font-semibold text-foreground">Project Name</h1>
-      
+
       <div className="flex items-center space-x-2">
         <Sheet>
           <SheetTrigger asChild>
@@ -168,32 +161,39 @@ export const Header = () => {
                 Управление настройками вашего проекта
               </SheetDescription>
             </SheetHeader>
-            
-            <div className="flex flex-col space-y-4 py-4">
-              {/* Здесь можно добавить другие настройки проекта */}
-            </div>
-
-            <SheetFooter className="absolute bottom-0 left-0 right-0 p-6 border-t">
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive">Удалить проект</Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Вы уверены?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Это действие нельзя отменить. Все данные проекта, включая файлы и историю чата, будут удалены.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Отмена</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDeleteProject}>
-                      Удалить
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </SheetFooter>
+            <ScrollArea className="flex-1 p-4">
+              <div className="space-y-4">
+                {messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`flex flex-col ${
+                      message.isAI ? "items-start" : "items-end"
+                    }`}
+                  >
+                    <div
+                      className={`max-w-[80%] rounded-lg p-3 ${
+                        message.isAI
+                          ? "bg-accent text-accent-foreground"
+                          : "bg-primary text-primary-foreground"
+                      }`}
+                    >
+                      <p>{message.content}</p>
+                      <div className="text-xs mt-2 opacity-70">{message.timestamp}</div>
+                    </div>
+                    {message.isAI && (
+                      <div className="flex gap-2 mt-1">
+                        <Button size="icon" variant="ghost">
+                          <RotateCcw className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="ghost">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
           </SheetContent>
         </Sheet>
 
