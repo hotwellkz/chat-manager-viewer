@@ -70,31 +70,40 @@ export const Header = () => {
         .select('file_path')
         .eq('user_id', user.id);
 
-      if (files) {
-        for (const file of files) {
-          await supabase.storage
-            .from('project_files')
-            .remove([file.file_path]);
-        }
+      if (files && files.length > 0) {
+        const filePaths = files.map(file => file.file_path);
+        await supabase.storage
+          .from('project_files')
+          .remove(filePaths);
       }
 
-      // Удаление записей из таблицы files
-      await supabase
-        .from('files')
-        .delete()
-        .eq('user_id', user.id);
-
-      // Удаление истории чата
-      await supabase
-        .from('chat_history')
-        .delete()
-        .eq('user_id', user.id);
+      // Удаление всех записей из таблиц
+      await Promise.all([
+        // Удаление файлов
+        supabase
+          .from('files')
+          .delete()
+          .eq('user_id', user.id),
+        
+        // Удаление истории чата
+        supabase
+          .from('chat_history')
+          .delete()
+          .eq('user_id', user.id),
+        
+        // Удаление развернутых проектов
+        supabase
+          .from('deployed_projects')
+          .delete()
+          .eq('user_id', user.id)
+      ]);
 
       toast({
         title: "Проект удален",
         description: "Все данные проекта были успешно удалены",
       });
     } catch (error) {
+      console.error('Error deleting project:', error);
       toast({
         title: "Ошибка",
         description: "Не удалось удалить проект",
