@@ -6,8 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 interface ChatMessage {
   id: string;
-  prompt: string;
-  response: string | null;
+  content: string;
   timestamp: string;
   is_ai: boolean;
 }
@@ -19,35 +18,35 @@ export const ChatHistory = () => {
     // Загрузка начальных сообщений
     const fetchMessages = async () => {
       const { data, error } = await supabase
-        .from("chat_history")
-        .select("*")
-        .order("timestamp", { ascending: true });
+        .from('chat_history')
+        .select('*')
+        .order('timestamp', { ascending: true });
 
-      if (error) {
-        console.error("Error fetching messages:", error);
-        return;
-      }
-
-      if (data) {
-        setMessages(data as ChatMessage[]);
+      if (!error && data) {
+        const formattedMessages = data.map(msg => ({
+          id: msg.id,
+          content: msg.prompt || msg.response || '',
+          timestamp: new Date(msg.timestamp).toLocaleString(),
+          is_ai: msg.is_ai || false
+        }));
+        setMessages(formattedMessages);
       }
     };
 
     fetchMessages();
 
-    // Подписка на новые сообщения
+    // Подписка на изменения в реальном времени
     const channel = supabase
-      .channel("schema-db-changes")
+      .channel('chat_changes')
       .on(
-        "postgres_changes",
+        'postgres_changes',
         {
-          event: "INSERT",
-          schema: "public",
-          table: "chat_history",
+          event: '*',
+          schema: 'public',
+          table: 'chat_history'
         },
-        (payload) => {
-          const newMessage = payload.new as ChatMessage;
-          setMessages((currentMessages) => [...currentMessages, newMessage]);
+        () => {
+          fetchMessages(); // Обновляем сообщения при любых изменениях
         }
       )
       .subscribe();
@@ -74,7 +73,7 @@ export const ChatHistory = () => {
                   : "bg-primary text-primary-foreground"
               }`}
             >
-              <p>{message.is_ai ? message.response : message.prompt}</p>
+              <p>{message.content}</p>
               <div className="text-xs mt-2 opacity-70">{message.timestamp}</div>
             </div>
             {message.is_ai && (
