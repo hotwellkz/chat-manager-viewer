@@ -60,9 +60,6 @@ serve(async (req) => {
       throw updateError
     }
 
-    // В реальном приложении здесь будет код для остановки Docker контейнеров
-    // через Docker API или другой механизм управления контейнерами
-
     console.log(`Successfully stopped ${inactiveContainers.length} containers`)
 
     return new Response(
