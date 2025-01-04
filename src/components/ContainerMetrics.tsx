@@ -11,13 +11,15 @@ interface ContainerMetricsProps {
   containerId: string;
 }
 
+type ErrorSeverity = 'warning' | 'error' | 'critical';
+
 interface Metrics {
   cpu_usage: number;
   memory_usage: number;
   memory_limit: number;
   error_count: number;
   error_type?: string;
-  error_severity?: 'warning' | 'error' | 'critical';
+  error_severity?: ErrorSeverity;
 }
 
 export const ContainerMetrics = ({ containerId }: ContainerMetricsProps) => {
@@ -36,17 +38,28 @@ export const ContainerMetrics = ({ containerId }: ContainerMetricsProps) => {
           .single();
 
         if (error) throw error;
-        setMetrics(data);
 
-        if (data.cpu_usage > 80) {
+        // Преобразуем error_severity в правильный тип
+        const formattedData: Metrics = {
+          cpu_usage: data.cpu_usage,
+          memory_usage: data.memory_usage,
+          memory_limit: data.memory_limit,
+          error_count: data.error_count,
+          error_type: data.error_type,
+          error_severity: data.error_severity as ErrorSeverity
+        };
+
+        setMetrics(formattedData);
+
+        if (formattedData.cpu_usage > 80) {
           toast({
             variant: "destructive",
             title: "Высокая загрузка CPU",
-            description: `Текущая загрузка CPU: ${data.cpu_usage.toFixed(1)}%`,
+            description: `Текущая загрузка CPU: ${formattedData.cpu_usage.toFixed(1)}%`,
           });
         }
 
-        if (data.memory_usage > data.memory_limit * 0.9) {
+        if (formattedData.memory_usage > formattedData.memory_limit * 0.9) {
           toast({
             variant: "destructive",
             title: "Критический уровень памяти",
@@ -54,11 +67,11 @@ export const ContainerMetrics = ({ containerId }: ContainerMetricsProps) => {
           });
         }
 
-        if (data.error_severity === 'critical') {
+        if (formattedData.error_severity === 'critical') {
           toast({
             variant: "destructive",
             title: "Критическая ошибка",
-            description: data.error_type || "Обнаружена критическая ошибка",
+            description: formattedData.error_type || "Обнаружена критическая ошибка",
           });
         }
       } catch (error) {
