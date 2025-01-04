@@ -1,17 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Package2, Loader2, ExternalLink, PlayCircle } from "lucide-react";
-import { Alert, AlertDescription } from "../ui/alert";
-import { Progress } from "../ui/progress";
-import { Button } from "../ui/button";
-import { Card } from "../ui/card";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "../ui/tooltip";
+import { Card } from "@/components/ui/card";
+import { BuildControls } from "./BuildControls";
+import { BuildStatus } from "./BuildStatus";
+import { DeploymentLink } from "./DeploymentLink";
 
 interface BuildMetadata {
   version: string;
@@ -139,70 +132,20 @@ export const DockerBuildManager = () => {
   return (
     <Card className="p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  onClick={handleBuild}
-                  disabled={isBuilding}
-                  size="icon"
-                  className="h-9 w-9"
-                >
-                  {isBuilding ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <PlayCircle className="h-4 w-4" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{isBuilding ? 'Идет сборка...' : 'Запустить сборку'}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          
-          {metadata && (
-            <span className="text-sm text-muted-foreground">
-              Версия: {metadata.version}
-            </span>
-          )}
-        </div>
-
-        {deployedUrl && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-9 w-9"
-                  onClick={() => window.open(deployedUrl, '_blank')}
-                >
-                  <ExternalLink className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Открыть проект</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        )}
+        <BuildControls 
+          isBuilding={isBuilding}
+          onBuild={handleBuild}
+          metadata={metadata}
+        />
+        <DeploymentLink url={deployedUrl} />
       </div>
       
-      {buildStatus.stage !== 'idle' && (
-        <div className="space-y-2">
-          <Alert variant={buildStatus.stage === 'error' ? 'destructive' : 'default'}>
-            <AlertDescription>
-              {buildStatus.message}
-            </AlertDescription>
-          </Alert>
-          
-          {isBuilding && (
-            <Progress value={buildStatus.progress} className="h-2" />
-          )}
-        </div>
-      )}
+      <BuildStatus 
+        stage={buildStatus.stage}
+        message={buildStatus.message}
+        progress={buildStatus.progress}
+        isBuilding={isBuilding}
+      />
     </Card>
   );
 };
