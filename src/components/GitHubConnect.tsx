@@ -30,20 +30,34 @@ export const GitHubConnect = () => {
   };
 
   const handleConnect = async () => {
-    // GitHub OAuth App client ID
-    const clientId = "your-github-client-id";
-    
-    // Генерируем случайное состояние для безопасности
-    const state = Math.random().toString(36).substring(7);
-    
-    // Сохраняем состояние в localStorage для проверки после редиректа
-    localStorage.setItem('github_oauth_state', state);
-    
-    // Формируем URL для авторизации GitHub
-    const authUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&scope=repo&state=${state}`;
-    
-    // Перенаправляем на GitHub для авторизации
-    window.location.href = authUrl;
+    try {
+      const { data } = await supabase.functions.invoke('github-integration', {
+        body: { action: 'get-client-id' }
+      });
+
+      if (!data?.clientId) {
+        throw new Error('Failed to get GitHub client ID');
+      }
+
+      // Генерируем случайное состояние для безопасности
+      const state = Math.random().toString(36).substring(7);
+      
+      // Сохраняем состояние в localStorage для проверки после редиректа
+      localStorage.setItem('github_oauth_state', state);
+      
+      // Формируем URL для авторизации GitHub
+      const authUrl = `https://github.com/login/oauth/authorize?client_id=${data.clientId}&scope=repo&state=${state}`;
+      
+      // Перенаправляем на GitHub для авторизации
+      window.location.href = authUrl;
+    } catch (error) {
+      console.error('Error connecting to GitHub:', error);
+      toast({
+        title: "Ошибка",
+        description: "Не удалось подключиться к GitHub",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleDisconnect = async () => {

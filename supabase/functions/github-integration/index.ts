@@ -26,6 +26,17 @@ serve(async (req) => {
 
     const { code, action } = await req.json()
 
+    if (action === 'get-client-id') {
+      return new Response(
+        JSON.stringify({ 
+          clientId: Deno.env.get('GITHUB_CLIENT_ID') 
+        }),
+        { 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
     if (action === 'auth') {
       // Обмен кода на токен доступа
       const params = new URLSearchParams({
