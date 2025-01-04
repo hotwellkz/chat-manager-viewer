@@ -29,10 +29,11 @@ export const FileChangeTracker = () => {
           table: 'files'
         },
         (payload: RealtimePostgresChangesPayload<FilesRow>) => {
-          if (payload.new) {
+          const newData = payload.new as FilesRow;
+          if (newData && newData.file_path) {
             setChanges(prev => [...prev, {
-              path: payload.new.file_path,
-              content: payload.new.content || ''
+              path: newData.file_path,
+              content: newData.content || ''
             }]);
           }
         }
