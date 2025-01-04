@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Card } from "./ui/card";
 import { Progress } from "./ui/progress";
-import { AlertCircle, Cpu, Memory } from "lucide-react";
+import { AlertCircle, Cpu, HardDrive } from "lucide-react";
 import { Alert, AlertDescription } from "./ui/alert";
 
 interface ContainerMetricsProps {
@@ -73,7 +73,7 @@ export const ContainerMetrics = ({ containerId }: ContainerMetricsProps) => {
 
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Memory className="h-4 w-4" />
+            <HardDrive className="h-4 w-4" />
             <span className="text-sm font-medium">Память</span>
             <span className="ml-auto text-sm">
               {Math.round(metrics.memory_usage)}MB / {Math.round(metrics.memory_limit)}MB
