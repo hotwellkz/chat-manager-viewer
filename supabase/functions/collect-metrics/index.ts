@@ -13,6 +13,7 @@ serve(async (req) => {
 
   try {
     const { containerId, metrics } = await req.json()
+    console.log('Получены метрики:', { containerId, metrics })
 
     if (!containerId || !metrics) {
       throw new Error('Container ID and metrics are required')
@@ -36,23 +37,25 @@ serve(async (req) => {
       })
 
     if (metricsError) {
+      console.error('Ошибка при сохранении метрик:', metricsError)
       throw metricsError
     }
 
     // Проверяем превышение лимитов
     if (metrics.cpu > 80 || metrics.memory > metrics.memoryLimit * 0.9) {
-      console.warn(`High resource usage detected for container ${containerId}`)
+      console.warn(`Обнаружено высокое потребление ресурсов для контейнера ${containerId}`)
       
       // Обновляем статус контейнера
       const { error: updateError } = await supabase
         .from('docker_containers')
         .update({ 
           status: 'warning',
-          container_logs: `High resource usage detected: CPU ${metrics.cpu}%, Memory ${metrics.memory}MB`
+          container_logs: `Высокое потребление ресурсов: CPU ${metrics.cpu}%, Память ${metrics.memory}MB`
         })
         .eq('id', containerId)
 
       if (updateError) {
+        console.error('Ошибка при обновлении статуса контейнера:', updateError)
         throw updateError
       }
     }
@@ -60,7 +63,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Metrics collected successfully'
+        message: 'Метрики успешно сохранены'
       }),
       { 
         headers: { 
@@ -71,7 +74,7 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Error:', error)
+    console.error('Ошибка:', error)
     return new Response(
       JSON.stringify({ 
         success: false, 
