@@ -25,7 +25,14 @@ export const PromptInput = () => {
     setIsLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Пользователь не авторизован");
+      if (!user) {
+        toast({
+          title: "Ошибка",
+          description: "Пользователь не авторизован",
+          variant: "destructive",
+        });
+        return;
+      }
 
       // Сохраняем промт в chat_history
       const { error: chatError } = await supabase
@@ -55,12 +62,13 @@ export const PromptInput = () => {
       const enhancedPrompt = `${frameworkInstructions}${prompt}`;
 
       // Отправляем запрос на бэкенд
-      const backendUrl = import.meta.env.VITE_BACKEND_URL || 'https://backendlovable006.onrender.com';
-      const response = await fetch(`${backendUrl}/api/prompt`, {
+      const response = await fetch('https://backendlovable006.onrender.com/api/prompt', {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
         },
+        credentials: 'include',
         body: JSON.stringify({ 
           prompt: enhancedPrompt,
           userId: user.id,
@@ -68,7 +76,10 @@ export const PromptInput = () => {
         }),
       });
 
-      if (!response.ok) throw new Error("Ошибка при обработке запроса");
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Ошибка при обработке запроса");
+      }
       
       const data = await response.json();
 
