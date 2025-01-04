@@ -149,6 +149,39 @@ export type Database = {
         }
         Relationships: []
       }
+      github_integrations: {
+        Row: {
+          access_token: string
+          created_at: string | null
+          id: string
+          last_sync: string | null
+          repository_name: string | null
+          repository_url: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          access_token: string
+          created_at?: string | null
+          id?: string
+          last_sync?: string | null
+          repository_name?: string | null
+          repository_url?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          access_token?: string
+          created_at?: string | null
+          id?: string
+          last_sync?: string | null
+          repository_name?: string | null
+          repository_url?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
