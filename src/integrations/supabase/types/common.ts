@@ -1,3 +1,5 @@
+import { ChatHistoryTable, DeployedProjectsTable, FilesTable, ProfilesTable } from './tables';
+
 export type Json =
   | string
   | number

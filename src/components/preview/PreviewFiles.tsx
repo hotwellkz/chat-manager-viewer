@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { FilesTable } from "@/integrations/supabase/types/tables";
 import { Editor } from "@monaco-editor/react";
+import { FileVersion } from "@/integrations/supabase/types/tables";
 
 interface PreviewFilesProps {
   showCode: boolean;
@@ -32,9 +33,13 @@ export const PreviewFiles = ({ showCode }: PreviewFilesProps) => {
       }
 
       if (data) {
-        setFiles(data);
-        if (data.length > 0) {
-          setSelectedFile(data[0]);
+        const typedData = data.map(file => ({
+          ...file,
+          previous_versions: (file.previous_versions as FileVersion[]) || []
+        }));
+        setFiles(typedData);
+        if (typedData.length > 0) {
+          setSelectedFile(typedData[0]);
         }
       }
     } catch (err) {

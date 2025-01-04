@@ -40,7 +40,7 @@ export const FileChangeTracker = () => {
               path: newData.file_path,
               content: newData.content || '',
               version: newData.version || 1,
-              previous_versions: newData.previous_versions as FileVersion[] || []
+              previous_versions: (newData.previous_versions as FileVersion[]) || []
             }]);
           }
         }
@@ -91,7 +91,7 @@ export const FileChangeTracker = () => {
 
         if (currentFile) {
           const newVersion = (currentFile.version || 1) + 1;
-          const previousVersions = currentFile.previous_versions as FileVersion[] || [];
+          const previousVersions = (currentFile.previous_versions as FileVersion[]) || [];
           
           previousVersions.push({
             version: currentFile.version || 1,
@@ -105,7 +105,7 @@ export const FileChangeTracker = () => {
             .update({
               content: change.content,
               version: newVersion,
-              previous_versions: previousVersions,
+              previous_versions: previousVersions as unknown as Json[],
               last_modified: new Date().toISOString(),
               modified_by: user.id
             })
