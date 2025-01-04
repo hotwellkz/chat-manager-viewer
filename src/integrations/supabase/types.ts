@@ -66,6 +66,56 @@ export type Database = {
         }
         Relationships: []
       }
+      docker_containers: {
+        Row: {
+          container_id: string | null
+          container_logs: string | null
+          container_url: string | null
+          created_at: string | null
+          framework: string | null
+          id: string
+          port: number | null
+          project_id: string | null
+          status: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          container_id?: string | null
+          container_logs?: string | null
+          container_url?: string | null
+          created_at?: string | null
+          framework?: string | null
+          id?: string
+          port?: number | null
+          project_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          container_id?: string | null
+          container_logs?: string | null
+          container_url?: string | null
+          created_at?: string | null
+          framework?: string | null
+          id?: string
+          port?: number | null
+          project_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "docker_containers_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "deployed_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       files: {
         Row: {
           content: string | null
