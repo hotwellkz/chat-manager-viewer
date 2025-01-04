@@ -3,11 +3,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "./ui/button";
 import { GitBranch } from "lucide-react";
+import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
+import { Database } from "@/integrations/supabase/types/common";
 
 interface FileChange {
   path: string;
   content: string;
 }
+
+type FilesRow = Database['public']['Tables']['files']['Row'];
 
 export const FileChangeTracker = () => {
   const [changes, setChanges] = useState<FileChange[]>([]);
@@ -15,7 +19,6 @@ export const FileChangeTracker = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Подписываемся на изменения в таблице files
     const channel = supabase
       .channel('file-changes')
       .on(
@@ -25,11 +28,11 @@ export const FileChangeTracker = () => {
           schema: 'public',
           table: 'files'
         },
-        (payload) => {
+        (payload: RealtimePostgresChangesPayload<FilesRow>) => {
           if (payload.new) {
             setChanges(prev => [...prev, {
               path: payload.new.file_path,
-              content: payload.new.content
+              content: payload.new.content || ''
             }]);
           }
         }
