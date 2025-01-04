@@ -4,8 +4,6 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Max-Age': '86400'
 }
 
 serve(async (req) => {
@@ -21,7 +19,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Получаем неактивные контейнеры
+    // Получаем неактивные контейнеры (не использовались более 24 часов)
     const { data: inactiveContainers, error: fetchError } = await supabase
       .from('docker_containers')
       .select('*')
@@ -50,11 +48,11 @@ serve(async (req) => {
       )
     }
 
-    // Обновляем статус контейнеров
+    // Обновляем статус контейнеров на stopping
     const { error: updateError } = await supabase
       .from('docker_containers')
       .update({ 
-        status: 'stopped',
+        status: 'stopping',
         container_logs: 'Container stopped due to inactivity'
       })
       .in('id', inactiveContainers.map(c => c.id))
@@ -64,7 +62,19 @@ serve(async (req) => {
       throw updateError
     }
 
-    console.log(`Successfully stopped ${inactiveContainers.length} containers`)
+    // Удаляем контейнеры после небольшой задержки
+    setTimeout(async () => {
+      const { error: deleteError } = await supabase
+        .from('docker_containers')
+        .delete()
+        .in('id', inactiveContainers.map(c => c.id))
+
+      if (deleteError) {
+        console.error('Error deleting containers:', deleteError)
+      } else {
+        console.log(`Successfully deleted ${inactiveContainers.length} containers`)
+      }
+    }, 2000)
 
     return new Response(
       JSON.stringify({ 
