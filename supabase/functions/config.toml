@@ -1,0 +1,19 @@
+project_id = "xbvjposgjusjngetlpfa"
+
+[functions.cleanup-containers]
+verify_jwt = false
+import_map = "import_map.json"
+[functions.cleanup-containers.cron]
+schedule = "0 */24 * * *"  # Запуск каждые 24 часа
+
+[functions.collect-metrics]
+verify_jwt = false
+import_map = "import_map.json"
+
+[functions.container-status]
+verify_jwt = false
+import_map = "import_map.json"
+
+[functions.prepare-deployment]
+verify_jwt = false
+import_map = "import_map.json"
