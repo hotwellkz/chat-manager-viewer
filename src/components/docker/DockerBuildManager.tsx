@@ -38,12 +38,12 @@ export const DockerBuildManager = () => {
     return stages.map(stage => ({
       label: STAGES[stage].message,
       status: buildStage === stage 
-        ? 'in-progress'
+        ? 'in-progress' as const
         : stages.indexOf(stage) < stages.indexOf(buildStage as BuildStage)
-          ? 'completed'
+          ? 'completed' as const
           : buildStage === 'error'
-            ? 'error'
-            : 'pending'
+            ? 'error' as const
+            : 'pending' as const
     }));
   };
 
