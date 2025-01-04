@@ -4,6 +4,7 @@ import { ContainerStatus } from "../ContainerStatus";
 import { useToast } from "@/hooks/use-toast";
 import { DeploymentUrl } from "./deployment/DeploymentUrl";
 import { DeploymentStatus } from "./deployment/DeploymentStatus";
+import { RealtimeChannel } from "@supabase/supabase-js";
 
 interface PreviewDeploymentProps {
   onError: (error: string | null) => void;
@@ -18,17 +19,17 @@ export const PreviewDeployment = ({ onError }: PreviewDeploymentProps) => {
 
   useEffect(() => {
     fetchLatestDeployment();
-    const unsubscribe = subscribeToDeploymentUpdates();
+    const channel = subscribeToDeploymentUpdates();
     return () => {
-      if (typeof unsubscribe === 'function') {
-        unsubscribe();
+      if (channel) {
+        supabase.removeChannel(channel);
       }
     };
   }, []);
 
-  const subscribeToDeploymentUpdates = async () => {
+  const subscribeToDeploymentUpdates = async (): Promise<RealtimeChannel | null> => {
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session) return () => {};
+    if (!session) return null;
 
     const channel = supabase
       .channel('deployment-updates')
@@ -67,9 +68,7 @@ export const PreviewDeployment = ({ onError }: PreviewDeploymentProps) => {
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return channel;
   };
 
   const getProgressForStatus = (status: string): number => {
