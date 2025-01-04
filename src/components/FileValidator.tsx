@@ -64,7 +64,7 @@ export const FileValidator = ({ file, onValidationComplete }: FileValidatorProps
 
       if (result.warnings.length > 0) {
         toast({
-          variant: "warning",
+          variant: "default",
           title: "Предупреждения",
           description: `Найдено ${result.warnings.length} предупреждений`,
         });
@@ -108,21 +108,21 @@ export const FileValidator = ({ file, onValidationComplete }: FileValidatorProps
             <div className="flex items-center gap-2">
               <Code className={getValidationColor(details.syntaxValid)} />
               <span>Синтаксис</span>
-              <Badge variant={details.syntaxValid ? "success" : "destructive"}>
+              <Badge variant={details.syntaxValid ? "default" : "destructive"}>
                 {details.syntaxValid ? "OK" : "Ошибка"}
               </Badge>
             </div>
             <div className="flex items-center gap-2">
               <FileText className={getValidationColor(details.structureValid)} />
               <span>Структура</span>
-              <Badge variant={details.structureValid ? "success" : "destructive"}>
+              <Badge variant={details.structureValid ? "default" : "destructive"}>
                 {details.structureValid ? "OK" : "Ошибка"}
               </Badge>
             </div>
             <div className="flex items-center gap-2">
               <Shield className={getValidationColor(details.securityValid)} />
               <span>Безопасность</span>
-              <Badge variant={details.securityValid ? "success" : "destructive"}>
+              <Badge variant={details.securityValid ? "default" : "destructive"}>
                 {details.securityValid ? "OK" : "Внимание"}
               </Badge>
             </div>
@@ -144,7 +144,7 @@ export const FileValidator = ({ file, onValidationComplete }: FileValidatorProps
           )}
 
           {warnings.length > 0 && (
-            <Alert variant="warning">
+            <Alert variant="default">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
                 <ul className="list-disc pl-4 space-y-1">
