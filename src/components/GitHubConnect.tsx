@@ -21,7 +21,7 @@ export const GitHubConnect = () => {
         .from('github_integrations')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       setIsConnected(!!data);
     } catch (error) {
