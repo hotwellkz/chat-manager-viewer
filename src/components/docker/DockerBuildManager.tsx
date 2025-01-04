@@ -1,11 +1,17 @@
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Package2, Loader2, RefreshCw } from "lucide-react";
+import { Package2, Loader2, ExternalLink, PlayCircle } from "lucide-react";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Progress } from "../ui/progress";
 import { Button } from "../ui/button";
 import { Card } from "../ui/card";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../ui/tooltip";
 
 interface BuildMetadata {
   version: string;
@@ -134,18 +140,27 @@ export const DockerBuildManager = () => {
     <Card className="p-4 space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Button
-            onClick={handleBuild}
-            disabled={isBuilding}
-            className="flex items-center gap-2"
-          >
-            {isBuilding ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Package2 className="h-4 w-4" />
-            )}
-            {isBuilding ? 'Сборка...' : 'Собрать образ'}
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  onClick={handleBuild}
+                  disabled={isBuilding}
+                  size="icon"
+                  className="h-9 w-9"
+                >
+                  {isBuilding ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <PlayCircle className="h-4 w-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{isBuilding ? 'Идет сборка...' : 'Запустить сборку'}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           
           {metadata && (
             <span className="text-sm text-muted-foreground">
@@ -155,15 +170,23 @@ export const DockerBuildManager = () => {
         </div>
 
         {deployedUrl && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => window.open(deployedUrl, '_blank')}
-            className="flex items-center gap-2"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Открыть проект
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={() => window.open(deployedUrl, '_blank')}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Открыть проект</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )}
       </div>
       
