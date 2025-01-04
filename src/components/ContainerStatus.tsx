@@ -16,8 +16,54 @@ export const ContainerStatus = ({ containerId }: ContainerStatusProps) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const setupWebSocket = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          console.error('No session found');
+          return;
+        }
+
+        // Подключаемся к WebSocket с JWT для аутентификации
+        const wsUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/container-status?jwt=${session.access_token}`;
+        const ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+          console.log('WebSocket connected');
+        };
+
+        ws.onmessage = (event) => {
+          const update = JSON.parse(event.data);
+          if (update.new && update.new.id === containerId) {
+            setStatus(update.new.status);
+            setUrl(update.new.container_url);
+            
+            if (update.new.status === 'running') {
+              toast.success('Контейнер успешно запущен!');
+            } else if (update.new.status === 'error') {
+              toast.error('Ошибка при запуске контейнера');
+            } else if (update.new.status === 'warning') {
+              toast.warning('Высокая нагрузка на контейнер');
+            }
+          }
+        };
+
+        ws.onerror = (error) => {
+          console.error('WebSocket error:', error);
+          toast.error('Ошибка подключения к WebSocket');
+        };
+
+        return () => {
+          ws.close();
+        };
+      } catch (error) {
+        console.error('Error setting up WebSocket:', error);
+        toast.error('Ошибка при настройке WebSocket');
+      }
+    };
+
     // Получаем начальный статус
-    const fetchStatus = async () => {
+    const fetchInitialStatus = async () => {
       try {
         const { data: container, error } = await supabase
           .from('docker_containers')
@@ -43,37 +89,11 @@ export const ContainerStatus = ({ containerId }: ContainerStatusProps) => {
       }
     };
 
-    fetchStatus();
-
-    // Подписываемся на обновления статуса
-    const channel = supabase
-      .channel('container-status')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'docker_containers',
-          filter: `id=eq.${containerId}`
-        },
-        (payload) => {
-          console.log('Получено обновление статуса:', payload);
-          if (payload.new) {
-            setStatus(payload.new.status);
-            setUrl(payload.new.container_url);
-            
-            if (payload.new.status === 'running') {
-              toast.success('Контейнер успешно запущен!');
-            } else if (payload.new.status === 'error') {
-              toast.error('Ошибка при запуске контейнера');
-            }
-          }
-        }
-      )
-      .subscribe();
+    fetchInitialStatus();
+    const cleanup = setupWebSocket();
 
     return () => {
-      supabase.removeChannel(channel);
+      cleanup.then(cleanupFn => cleanupFn?.());
     };
   }, [containerId]);
 
@@ -85,6 +105,8 @@ export const ContainerStatus = ({ containerId }: ContainerStatusProps) => {
         return 'bg-red-500';
       case 'creating':
         return 'bg-yellow-500';
+      case 'warning':
+        return 'bg-orange-500';
       default:
         return 'bg-gray-500';
     }
