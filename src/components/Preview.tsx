@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { 
   Maximize2, 
@@ -6,27 +7,19 @@ import {
   Code,
   Eye
 } from "lucide-react";
-import { FilesTable } from "@/integrations/supabase/types/tables";
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { Editor } from "@monaco-editor/react";
-import { ContainerStatus } from "./ContainerStatus";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { PreviewFiles } from "./preview/PreviewFiles";
+import { PreviewDeployment } from "./preview/PreviewDeployment";
 
 export const Preview = () => {
   const [showCode, setShowCode] = useState(false);
-  const [files, setFiles] = useState<FilesTable['Row'][]>([]);
-  const [selectedFile, setSelectedFile] = useState<FilesTable['Row'] | null>(null);
-  const [deploymentUrl, setDeploymentUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [containerId, setContainerId] = useState<string | null>(null);
   const navigate = useNavigate();
   
   useEffect(() => {
     checkAuth();
-    fetchFiles();
-    fetchLatestDeployment();
   }, []);
 
   const checkAuth = async () => {
@@ -35,82 +28,6 @@ export const Preview = () => {
       toast.error('Необходима авторизация');
       navigate('/login');
       return;
-    }
-  };
-
-  const fetchFiles = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const { data, error } = await supabase
-        .from('files')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .order('created_at', { ascending: false });
-      
-      if (error) {
-        console.error('Error fetching files:', error);
-        return;
-      }
-
-      if (data) {
-        setFiles(data);
-        if (data.length > 0) {
-          setSelectedFile(data[0]);
-        }
-      }
-    } catch (err) {
-      console.error('Error in fetchFiles:', err);
-    }
-  };
-
-  const fetchLatestDeployment = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const { data: deployment, error } = await supabase
-        .from('deployed_projects')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .order('last_deployment', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error fetching deployment:', error);
-        setError('Ошибка при получении данных о развертывании');
-        return;
-      }
-
-      if (deployment) {
-        setDeploymentUrl(deployment.project_url);
-        
-        const { data: container, error: containerError } = await supabase
-          .from('docker_containers')
-          .select('*')
-          .eq('project_id', deployment.id)
-          .eq('user_id', session.user.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (containerError) {
-          console.error('Error fetching container:', containerError);
-          return;
-        }
-
-        if (container) {
-          setContainerId(container.id);
-        }
-      } else {
-        setDeploymentUrl(null);
-        setContainerId(null);
-      }
-    } catch (err) {
-      console.error('Error in fetchLatestDeployment:', err);
-      setError('Произошла ошибка при получении данных о развертывании');
     }
   };
   
@@ -146,19 +63,7 @@ export const Preview = () => {
           {error ? (
             <span className="text-sm text-red-500">{error}</span>
           ) : (
-            <>
-              <a 
-                href={deploymentUrl || '#'} 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-sm text-muted-foreground hover:text-foreground"
-              >
-                {deploymentUrl || 'Ожидание развертывания...'}
-              </a>
-              {containerId && (
-                <ContainerStatus containerId={containerId} />
-              )}
-            </>
+            <PreviewDeployment onError={setError} />
           )}
         </div>
         <div className="flex gap-2">
@@ -177,28 +82,10 @@ export const Preview = () => {
         </div>
       </div>
       <div className="flex-1 bg-background">
-        {showCode ? (
-          <div className="h-full">
-            {selectedFile ? (
-              <Editor
-                height="100%"
-                defaultLanguage="typescript"
-                value={selectedFile.content || '// Нет содержимого'}
-                options={{
-                  readOnly: true,
-                  minimap: { enabled: false },
-                  fontSize: 14,
-                }}
-              />
-            ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground">
-                Выберите файл для просмотра
-              </div>
-            )}
-          </div>
-        ) : (
+        <PreviewFiles showCode={showCode} />
+        {!showCode && (
           <iframe 
-            src={deploymentUrl || 'about:blank'}
+            src={error ? 'about:blank' : undefined}
             className="w-full h-full border-none"
             title="Preview"
           />
