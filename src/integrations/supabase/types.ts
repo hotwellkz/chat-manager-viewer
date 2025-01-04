@@ -42,6 +42,8 @@ export type Database = {
           cpu_usage: number | null
           created_at: string | null
           error_count: number | null
+          error_severity: string | null
+          error_type: string | null
           id: string
           memory_limit: number | null
           memory_usage: number | null
@@ -52,6 +54,8 @@ export type Database = {
           cpu_usage?: number | null
           created_at?: string | null
           error_count?: number | null
+          error_severity?: string | null
+          error_type?: string | null
           id?: string
           memory_limit?: number | null
           memory_usage?: number | null
@@ -62,6 +66,8 @@ export type Database = {
           cpu_usage?: number | null
           created_at?: string | null
           error_count?: number | null
+          error_severity?: string | null
+          error_type?: string | null
           id?: string
           memory_limit?: number | null
           memory_usage?: number | null

@@ -5,6 +5,7 @@ import { Card } from "./ui/card";
 import { Progress } from "./ui/progress";
 import { AlertCircle, Cpu, HardDrive, AlertTriangle } from "lucide-react";
 import { Alert, AlertDescription } from "./ui/alert";
+import { cn } from "@/lib/utils";
 
 interface ContainerMetricsProps {
   containerId: string;
@@ -37,7 +38,6 @@ export const ContainerMetrics = ({ containerId }: ContainerMetricsProps) => {
         if (error) throw error;
         setMetrics(data);
 
-        // Показываем предупреждения в зависимости от метрик
         if (data.cpu_usage > 80) {
           toast({
             variant: "destructive",
@@ -66,7 +66,6 @@ export const ContainerMetrics = ({ containerId }: ContainerMetricsProps) => {
       }
     };
 
-    // Получаем метрики каждые 30 секунд
     fetchMetrics();
     const interval = setInterval(fetchMetrics, 30000);
 
@@ -95,8 +94,7 @@ export const ContainerMetrics = ({ containerId }: ContainerMetricsProps) => {
           </div>
           <Progress 
             value={metrics.cpu_usage} 
-            className="h-2" 
-            indicatorClassName={getProgressColor(metrics.cpu_usage)}
+            className={cn("h-2", getProgressColor(metrics.cpu_usage))}
           />
         </div>
 
@@ -110,13 +108,12 @@ export const ContainerMetrics = ({ containerId }: ContainerMetricsProps) => {
           </div>
           <Progress 
             value={memoryPercentage} 
-            className="h-2"
-            indicatorClassName={getProgressColor(memoryPercentage)}
+            className={cn("h-2", getProgressColor(memoryPercentage))}
           />
         </div>
 
         {metrics.error_count > 0 && (
-          <Alert variant={metrics.error_severity === 'critical' ? 'destructive' : 'warning'}>
+          <Alert variant={metrics.error_severity === 'critical' ? 'destructive' : 'default'}>
             {metrics.error_severity === 'critical' ? (
               <AlertCircle className="h-4 w-4" />
             ) : (
