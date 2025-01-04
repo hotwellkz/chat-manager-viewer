@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "./ui/button";
@@ -7,6 +7,7 @@ import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { Database } from "@/integrations/supabase/types/common";
 import { FileValidator } from "./FileValidator";
 import { FileVersion } from "@/integrations/supabase/types/tables";
+import { Json } from "@/integrations/supabase/types/common";
 
 interface FileChange {
   path: string;
@@ -40,7 +41,7 @@ export const FileChangeTracker = () => {
               path: newData.file_path,
               content: newData.content || '',
               version: newData.version || 1,
-              previous_versions: (newData.previous_versions as FileVersion[]) || []
+              previous_versions: (newData.previous_versions as unknown as FileVersion[]) || []
             }]);
           }
         }
@@ -81,7 +82,6 @@ export const FileChangeTracker = () => {
         throw new Error('Пользователь не авторизован');
       }
 
-      // Обновляем версии файлов перед синхронизацией
       for (const change of changes) {
         const { data: currentFile } = await supabase
           .from('files')
@@ -91,7 +91,7 @@ export const FileChangeTracker = () => {
 
         if (currentFile) {
           const newVersion = (currentFile.version || 1) + 1;
-          const previousVersions = (currentFile.previous_versions as FileVersion[]) || [];
+          const previousVersions = (currentFile.previous_versions as unknown as FileVersion[]) || [];
           
           previousVersions.push({
             version: currentFile.version || 1,

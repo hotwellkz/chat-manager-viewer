@@ -35,7 +35,7 @@ export const PreviewFiles = ({ showCode }: PreviewFilesProps) => {
       if (data) {
         const typedData = data.map(file => ({
           ...file,
-          previous_versions: (file.previous_versions as FileVersion[]) || []
+          previous_versions: (file.previous_versions as unknown as FileVersion[]) || []
         }));
         setFiles(typedData);
         if (typedData.length > 0) {
