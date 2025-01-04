@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { ContainerMetrics } from "./ContainerMetrics";
 
 interface ContainerStatusProps {
   containerId: string;
@@ -98,7 +99,7 @@ export const ContainerStatus = ({ containerId }: ContainerStatusProps) => {
   }
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2">
         <Badge className={getStatusColor(status)}>
           {status === 'running' && 'Запущен'}
@@ -117,6 +118,10 @@ export const ContainerStatus = ({ containerId }: ContainerStatusProps) => {
           </a>
         )}
       </div>
+      
+      {status === 'running' && (
+        <ContainerMetrics containerId={containerId} />
+      )}
     </div>
   );
 };

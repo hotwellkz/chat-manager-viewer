@@ -36,6 +36,47 @@ export type Database = {
         }
         Relationships: []
       }
+      container_metrics: {
+        Row: {
+          container_id: string | null
+          cpu_usage: number | null
+          created_at: string | null
+          error_count: number | null
+          id: string
+          memory_limit: number | null
+          memory_usage: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          container_id?: string | null
+          cpu_usage?: number | null
+          created_at?: string | null
+          error_count?: number | null
+          id?: string
+          memory_limit?: number | null
+          memory_usage?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          container_id?: string | null
+          cpu_usage?: number | null
+          created_at?: string | null
+          error_count?: number | null
+          id?: string
+          memory_limit?: number | null
+          memory_usage?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "container_metrics_container_id_fkey"
+            columns: ["container_id"]
+            isOneToOne: false
+            referencedRelation: "docker_containers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deployed_projects: {
         Row: {
           created_at: string | null
