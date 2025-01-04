@@ -24,23 +24,47 @@ export const handleFiles = async (req, res) => {
 
       if (uploadError) throw uploadError;
 
+      // Получаем текущую версию файла, если она существует
+      const { data: existingFile } = await supabase
+        .from('files')
+        .select('*')
+        .eq('file_path', filePath)
+        .single();
+
+      const version = existingFile ? (existingFile.version || 1) + 1 : 1;
+      const previousVersions = existingFile?.previous_versions || [];
+
+      if (existingFile) {
+        previousVersions.push({
+          version: existingFile.version || 1,
+          content: existingFile.content || '',
+          modified_at: existingFile.last_modified || new Date().toISOString(),
+          modified_by: existingFile.modified_by || userId
+        });
+      }
+
       // Сохраняем метаданные
       const { error: dbError } = await supabase
         .from('files')
-        .insert({
+        .upsert({
           user_id: userId,
           filename: path.basename(file.path),
           file_path: filePath,
           content_type: 'text/plain',
           size: Buffer.byteLength(file.content, 'utf8'),
-          content: file.content
+          content: file.content,
+          version: version,
+          previous_versions: previousVersions,
+          last_modified: new Date().toISOString(),
+          modified_by: userId
         });
 
       if (dbError) throw dbError;
       
       results.push({
         path: file.path,
-        url: `/uploads/${file.path}`
+        url: `/uploads/${file.path}`,
+        version: version
       });
     }
 
@@ -106,6 +130,25 @@ Please analyze these files and provide necessary updates.`
 
         if (dbError) throw dbError;
       } else if (file.action === 'add' || file.action === 'update') {
+        // Получаем текущую версию файла, если она существует
+        const { data: existingFile } = await supabase
+          .from('files')
+          .select('*')
+          .eq('file_path', filePath)
+          .single();
+
+        const version = existingFile ? (existingFile.version || 1) + 1 : 1;
+        const previousVersions = existingFile?.previous_versions || [];
+
+        if (existingFile) {
+          previousVersions.push({
+            version: existingFile.version || 1,
+            content: existingFile.content || '',
+            modified_at: existingFile.last_modified || new Date().toISOString(),
+            modified_by: existingFile.modified_by || userId
+          });
+        }
+
         // Загружаем файл в Storage
         const { error: uploadError } = await supabase.storage
           .from('project_files')
@@ -125,7 +168,11 @@ Please analyze these files and provide necessary updates.`
             file_path: filePath,
             content_type: 'text/plain',
             size: Buffer.byteLength(file.content, 'utf8'),
-            content: file.content
+            content: file.content,
+            version: version,
+            previous_versions: previousVersions,
+            last_modified: new Date().toISOString(),
+            modified_by: userId
           });
 
         if (dbError) throw dbError;

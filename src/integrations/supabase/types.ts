@@ -165,8 +165,12 @@ export type Database = {
           file_path: string
           filename: string
           id: string
+          last_modified: string | null
+          modified_by: string | null
+          previous_versions: Json | null
           size: number | null
           user_id: string | null
+          version: number | null
         }
         Insert: {
           content?: string | null
@@ -175,8 +179,12 @@ export type Database = {
           file_path: string
           filename: string
           id?: string
+          last_modified?: string | null
+          modified_by?: string | null
+          previous_versions?: Json | null
           size?: number | null
           user_id?: string | null
+          version?: number | null
         }
         Update: {
           content?: string | null
@@ -185,8 +193,12 @@ export type Database = {
           file_path?: string
           filename?: string
           id?: string
+          last_modified?: string | null
+          modified_by?: string | null
+          previous_versions?: Json | null
           size?: number | null
           user_id?: string | null
+          version?: number | null
         }
         Relationships: []
       }

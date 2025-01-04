@@ -2,14 +2,17 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "./ui/button";
-import { GitBranch } from "lucide-react";
+import { GitBranch, History } from "lucide-react";
 import { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { Database } from "@/integrations/supabase/types/common";
 import { FileValidator } from "./FileValidator";
+import { FileVersion } from "@/integrations/supabase/types/tables";
 
 interface FileChange {
   path: string;
   content: string;
+  version?: number;
+  previous_versions?: FileVersion[];
 }
 
 type FilesRow = Database['public']['Tables']['files']['Row'];
@@ -35,7 +38,9 @@ export const FileChangeTracker = () => {
           if (newData && newData.file_path) {
             setChanges(prev => [...prev, {
               path: newData.file_path,
-              content: newData.content || ''
+              content: newData.content || '',
+              version: newData.version || 1,
+              previous_versions: newData.previous_versions as FileVersion[] || []
             }]);
           }
         }
@@ -76,6 +81,38 @@ export const FileChangeTracker = () => {
         throw new Error('Пользователь не авторизован');
       }
 
+      // Обновляем версии файлов перед синхронизацией
+      for (const change of changes) {
+        const { data: currentFile } = await supabase
+          .from('files')
+          .select('*')
+          .eq('file_path', change.path)
+          .single();
+
+        if (currentFile) {
+          const newVersion = (currentFile.version || 1) + 1;
+          const previousVersions = currentFile.previous_versions || [];
+          
+          previousVersions.push({
+            version: currentFile.version || 1,
+            content: currentFile.content || '',
+            modified_at: currentFile.last_modified || new Date().toISOString(),
+            modified_by: currentFile.modified_by || user.id
+          });
+
+          await supabase
+            .from('files')
+            .update({
+              content: change.content,
+              version: newVersion,
+              previous_versions: previousVersions,
+              last_modified: new Date().toISOString(),
+              modified_by: user.id
+            })
+            .eq('file_path', change.path);
+        }
+      }
+
       const response = await supabase.functions.invoke('github-sync', {
         body: {
           userId: user.id,
@@ -113,16 +150,23 @@ export const FileChangeTracker = () => {
     <div className="fixed bottom-4 right-4 p-4 bg-background border rounded-lg shadow-lg">
       <div className="space-y-4">
         {changes.map((change) => (
-          <FileValidator
-            key={change.path}
-            file={{
-              name: change.path.split('/').pop() || '',
-              path: change.path,
-              content: change.content,
-              size: new Blob([change.content]).size
-            }}
-            onValidationComplete={(isValid) => handleValidationComplete(change.path, isValid)}
-          />
+          <div key={change.path} className="space-y-2">
+            <FileValidator
+              file={{
+                name: change.path.split('/').pop() || '',
+                path: change.path,
+                content: change.content,
+                size: new Blob([change.content]).size
+              }}
+              onValidationComplete={(isValid) => handleValidationComplete(change.path, isValid)}
+            />
+            {change.version && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <History className="h-4 w-4" />
+                <span>Версия {change.version}</span>
+              </div>
+            )}
+          </div>
         ))}
         <div className="flex items-center gap-4">
           <span className="text-sm text-muted-foreground">
