@@ -12,58 +12,77 @@ serve(async (req) => {
   }
 
   try {
+    const { containerId, metrics } = await req.json()
+
+    if (!containerId || !metrics) {
+      throw new Error('Container ID and metrics are required')
+    }
+
+    // Создаем клиент Supabase
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Получаем все активные контейнеры
-    const { data: containers, error: containersError } = await supabase
-      .from('docker_containers')
-      .select('*')
-      .eq('status', 'running')
+    // Сохраняем метрики в базу данных
+    const { error: metricsError } = await supabase
+      .from('container_metrics')
+      .insert({
+        container_id: containerId,
+        cpu_usage: metrics.cpu,
+        memory_usage: metrics.memory,
+        memory_limit: metrics.memoryLimit,
+        error_count: metrics.errors || 0
+      })
 
-    if (containersError) {
-      console.error('Error fetching containers:', containersError)
-      throw containersError
+    if (metricsError) {
+      throw metricsError
     }
 
-    // Для каждого контейнера собираем метрики
-    for (const container of containers || []) {
-      // В реальном приложении здесь будет логика получения реальных метрик
-      // Сейчас генерируем тестовые данные
-      const metrics = {
-        container_id: container.id,
-        cpu_usage: Math.random() * 100, // CPU usage в процентах
-        memory_usage: Math.random() * 512, // Memory usage в МБ
-        memory_limit: 512, // Memory limit в МБ
-        error_count: Math.floor(Math.random() * 5), // Случайное количество ошибок
-      }
+    // Проверяем превышение лимитов
+    if (metrics.cpu > 80 || metrics.memory > metrics.memoryLimit * 0.9) {
+      console.warn(`High resource usage detected for container ${containerId}`)
+      
+      // Обновляем статус контейнера
+      const { error: updateError } = await supabase
+        .from('docker_containers')
+        .update({ 
+          status: 'warning',
+          container_logs: `High resource usage detected: CPU ${metrics.cpu}%, Memory ${metrics.memory}MB`
+        })
+        .eq('id', containerId)
 
-      const { error: metricsError } = await supabase
-        .from('container_metrics')
-        .insert(metrics)
-
-      if (metricsError) {
-        console.error('Error inserting metrics:', metricsError)
-        throw metricsError
+      if (updateError) {
+        throw updateError
       }
     }
 
     return new Response(
-      JSON.stringify({ success: true }),
+      JSON.stringify({ 
+        success: true, 
+        message: 'Metrics collected successfully'
+      }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200 
+        headers: { 
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        } 
       }
     )
+
   } catch (error) {
     console.error('Error:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        success: false, 
+        error: error.message 
+      }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500
+        headers: { 
+          ...corsHeaders,
+          'Content-Type': 'application/json'
+        },
+        status: 400
       }
     )
   }
