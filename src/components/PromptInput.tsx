@@ -61,13 +61,17 @@ export const PromptInput = () => {
 
       const enhancedPrompt = `${frameworkInstructions}${prompt}`;
 
-      // Отправляем запрос на бэкенд
-      const response = await fetch('https://backendlovable006.onrender.com/api/prompt', {
+      // Получаем токен сессии для авторизации
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No active session');
+
+      // Отправляем запрос на бэкенд с правильными заголовками
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/prompt`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
         },
-        credentials: 'include',
         body: JSON.stringify({ 
           prompt: enhancedPrompt,
           userId: user.id,
