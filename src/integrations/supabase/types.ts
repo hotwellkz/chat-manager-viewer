@@ -36,6 +36,53 @@ export type Database = {
         }
         Relationships: []
       }
+      container_metrics: {
+        Row: {
+          container_id: string | null
+          cpu_usage: number | null
+          created_at: string | null
+          error_count: number | null
+          error_severity: string | null
+          error_type: string | null
+          id: string
+          memory_limit: number | null
+          memory_usage: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          container_id?: string | null
+          cpu_usage?: number | null
+          created_at?: string | null
+          error_count?: number | null
+          error_severity?: string | null
+          error_type?: string | null
+          id?: string
+          memory_limit?: number | null
+          memory_usage?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          container_id?: string | null
+          cpu_usage?: number | null
+          created_at?: string | null
+          error_count?: number | null
+          error_severity?: string | null
+          error_type?: string | null
+          id?: string
+          memory_limit?: number | null
+          memory_usage?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "container_metrics_container_id_fkey"
+            columns: ["container_id"]
+            isOneToOne: false
+            referencedRelation: "docker_containers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deployed_projects: {
         Row: {
           created_at: string | null
@@ -66,6 +113,56 @@ export type Database = {
         }
         Relationships: []
       }
+      docker_containers: {
+        Row: {
+          container_id: string | null
+          container_logs: string | null
+          container_url: string | null
+          created_at: string | null
+          framework: string | null
+          id: string
+          port: number | null
+          project_id: string | null
+          status: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          container_id?: string | null
+          container_logs?: string | null
+          container_url?: string | null
+          created_at?: string | null
+          framework?: string | null
+          id?: string
+          port?: number | null
+          project_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          container_id?: string | null
+          container_logs?: string | null
+          container_url?: string | null
+          created_at?: string | null
+          framework?: string | null
+          id?: string
+          port?: number | null
+          project_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "docker_containers_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "deployed_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       files: {
         Row: {
           content: string | null
@@ -74,8 +171,12 @@ export type Database = {
           file_path: string
           filename: string
           id: string
+          last_modified: string | null
+          modified_by: string | null
+          previous_versions: Json | null
           size: number | null
           user_id: string | null
+          version: number | null
         }
         Insert: {
           content?: string | null
@@ -84,8 +185,12 @@ export type Database = {
           file_path: string
           filename: string
           id?: string
+          last_modified?: string | null
+          modified_by?: string | null
+          previous_versions?: Json | null
           size?: number | null
           user_id?: string | null
+          version?: number | null
         }
         Update: {
           content?: string | null
@@ -94,7 +199,44 @@ export type Database = {
           file_path?: string
           filename?: string
           id?: string
+          last_modified?: string | null
+          modified_by?: string | null
+          previous_versions?: Json | null
           size?: number | null
+          user_id?: string | null
+          version?: number | null
+        }
+        Relationships: []
+      }
+      github_integrations: {
+        Row: {
+          access_token: string
+          created_at: string | null
+          id: string
+          last_sync: string | null
+          repository_name: string | null
+          repository_url: string | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          access_token: string
+          created_at?: string | null
+          id?: string
+          last_sync?: string | null
+          repository_name?: string | null
+          repository_url?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          access_token?: string
+          created_at?: string | null
+          id?: string
+          last_sync?: string | null
+          repository_name?: string | null
+          repository_url?: string | null
+          updated_at?: string | null
           user_id?: string | null
         }
         Relationships: []
@@ -114,6 +256,27 @@ export type Database = {
           created_at?: string
           id?: string
           username?: string | null
+        }
+        Relationships: []
+      }
+      secrets: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          value: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          value?: string
         }
         Relationships: []
       }

@@ -1,0 +1,25 @@
+project_id = "xbvjposgjusjngetlpfa"
+
+[functions.cleanup-containers]
+verify_jwt = true
+
+[functions.collect-metrics]
+verify_jwt = true
+
+[functions.container-status]
+verify_jwt = true
+
+[functions.github-integration]
+verify_jwt = true
+
+[functions.handle-files]
+verify_jwt = true
+
+[functions.prepare-deployment]
+verify_jwt = true
+
+[functions.process-prompt]
+verify_jwt = true
+
+[functions.package-files]
+verify_jwt = true

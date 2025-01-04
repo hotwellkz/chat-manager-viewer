@@ -1,9 +1,4 @@
-import { 
-  ChatHistoryTable, 
-  DeployedProjectsTable, 
-  FilesTable, 
-  ProfilesTable 
-} from './tables';
+import { ChatHistoryTable, DeployedProjectsTable, FilesTable, ProfilesTable } from './tables';
 
 export type Json =
   | string

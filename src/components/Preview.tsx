@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Button } from "./ui/button";
 import { 
   Maximize2, 
@@ -6,69 +7,28 @@ import {
   Code,
   Eye
 } from "lucide-react";
-import { FilesTable } from "@/integrations/supabase/types/tables";
-import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Editor } from "@monaco-editor/react";
+import { PreviewFiles } from "./preview/PreviewFiles";
+import { PreviewDeployment } from "./preview/PreviewDeployment";
+import { FileChangeTracker } from "./FileChangeTracker";
 
 export const Preview = () => {
   const [showCode, setShowCode] = useState(false);
-  const [files, setFiles] = useState<FilesTable['Row'][]>([]);
-  const [selectedFile, setSelectedFile] = useState<FilesTable['Row'] | null>(null);
-  const [deploymentUrl, setDeploymentUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
   
   useEffect(() => {
-    fetchFiles();
-    fetchLatestDeployment();
+    checkAuth();
   }, []);
 
-  const fetchFiles = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('files')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (error) {
-        console.error('Error fetching files:', error);
-        return;
-      }
-
-      if (data) {
-        setFiles(data);
-        if (data.length > 0) {
-          setSelectedFile(data[0]);
-        }
-      }
-    } catch (err) {
-      console.error('Error in fetchFiles:', err);
-    }
-  };
-
-  const fetchLatestDeployment = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('deployed_projects')
-        .select('*')
-        .order('last_deployment', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error fetching deployment:', error);
-        setError('Ошибка при получении данных о развертывании');
-        return;
-      }
-
-      if (data && data.project_url) {
-        setDeploymentUrl(data.project_url);
-      } else {
-        setDeploymentUrl(null);
-      }
-    } catch (err) {
-      console.error('Error in fetchLatestDeployment:', err);
-      setError('Произошла ошибка при получении данных о развертывании');
+  const checkAuth = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      toast.error('Необходима авторизация');
+      navigate('/login');
+      return;
     }
   };
   
@@ -100,18 +60,13 @@ export const Preview = () => {
   return (
     <div className="h-full flex flex-col border-l border-border">
       <div className="p-2 border-b border-border flex justify-between items-center">
-        {error ? (
-          <span className="text-sm text-red-500">{error}</span>
-        ) : (
-          <a 
-            href={deploymentUrl || '#'} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-sm text-muted-foreground hover:text-foreground"
-          >
-            {deploymentUrl || 'Ожидание развертывания...'}
-          </a>
-        )}
+        <div className="flex flex-col gap-2">
+          {error ? (
+            <span className="text-sm text-red-500">{error}</span>
+          ) : (
+            <PreviewDeployment onError={setError} />
+          )}
+        </div>
         <div className="flex gap-2">
           <Button variant="ghost" size="icon" onClick={toggleView}>
             {showCode ? <Eye className="h-4 w-4" /> : <Code className="h-4 w-4" />}
@@ -128,33 +83,16 @@ export const Preview = () => {
         </div>
       </div>
       <div className="flex-1 bg-background">
-        {showCode ? (
-          <div className="h-full">
-            {selectedFile ? (
-              <Editor
-                height="100%"
-                defaultLanguage="typescript"
-                value={selectedFile.content || '// Нет содержимого'}
-                options={{
-                  readOnly: true,
-                  minimap: { enabled: false },
-                  fontSize: 14,
-                }}
-              />
-            ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground">
-                Выберите файл для просмотра
-              </div>
-            )}
-          </div>
-        ) : (
+        <PreviewFiles showCode={showCode} />
+        {!showCode && (
           <iframe 
-            src={deploymentUrl || 'about:blank'}
+            src={error ? 'about:blank' : undefined}
             className="w-full h-full border-none"
             title="Preview"
           />
         )}
       </div>
+      <FileChangeTracker />
     </div>
   );
 };

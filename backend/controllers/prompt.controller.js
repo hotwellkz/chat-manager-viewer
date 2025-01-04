@@ -1,119 +1,178 @@
-import OpenAI from 'openai';
-import { createClient } from '@supabase/supabase-js';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+import { initOpenAI } from '../utils/openai.js';
+import { supabase } from '../config/supabase.js';
+import path from 'path';
 
 export const handlePrompt = async (req, res) => {
   try {
+    console.log('Получен запрос:', req.body);
     const { prompt, framework, userId } = req.body;
 
+    if (!prompt || !framework || !userId) {
+      console.error('Отсутствуют обязательные параметры:', { prompt, framework, userId });
+      return res.status(400).json({ error: 'Отсутствуют обязательные параметры' });
+    }
+
+    // Инициализируем OpenAI
+    const openai = await initOpenAI();
+    if (!openai) {
+      console.error('Не удалось инициализировать OpenAI');
+      return res.status(500).json({ error: 'Ошибка инициализации OpenAI' });
+    }
+
+    console.log('Сохраняем промпт в историю чата...');
     // Сохраняем промпт в историю чата
     const { error: chatError } = await supabase
       .from('chat_history')
       .insert({
         user_id: userId,
-        prompt: prompt,
-        is_ai: false
+        prompt,
+        is_ai: false,
       });
 
-    if (chatError) throw chatError;
+    if (chatError) {
+      console.error('Ошибка при сохранении в chat_history:', chatError);
+      throw chatError;
+    }
 
     // Формируем системный промт в зависимости от фреймворка
-    let systemPrompt = "You are a helpful assistant that generates structured responses for code generation. ";
-    
+    let systemPrompt = `You are a helpful assistant that generates structured responses for code generation. 
+    Your response must always be in the following JSON format:
+    {
+      "files": [
+        {
+          "path": "relative/path/to/file.ext",
+          "content": "file content here",
+          "type": "create|update|delete"
+        }
+      ],
+      "description": "Detailed explanation of changes",
+      "dependencies": ["package1", "package2"],
+      "containerConfig": {
+        "port": number,
+        "env": ["KEY=value"]
+      }
+    }`;
+
     switch (framework) {
-      case "react":
-        systemPrompt += "You specialize in creating React applications with TypeScript, React Router, and Tailwind CSS. Create all necessary files for a complete deployable application.";
+      case 'react':
+        systemPrompt += "You specialize in creating React applications with TypeScript, React Router, and Tailwind CSS. ";
         break;
-      case "node":
-        systemPrompt += "You specialize in creating Node.js applications with Express.js, MongoDB/Mongoose, and JWT authentication. Create all necessary files for a complete deployable application.";
+      case 'node':
+        systemPrompt += "You specialize in creating Node.js applications with Express.js, MongoDB/Mongoose, and JWT authentication. ";
         break;
-      case "vue":
-        systemPrompt += "You specialize in creating Vue.js applications with TypeScript, Vue Router, and Vuex. Create all necessary files for a complete deployable application.";
+      case 'vue':
+        systemPrompt += "You specialize in creating Vue.js applications with TypeScript, Vue Router, and Vuex. ";
         break;
     }
-    
-    systemPrompt += " Always return response in JSON format with fields: files (array of file objects with path and content), description (string with explanation).";
 
+    console.log('Отправляем запрос к OpenAI...');
     // Получаем ответ от OpenAI
     const completion = await openai.chat.completions.create({
-      model: "gpt-4",
+      model: 'gpt-4-turbo-preview',
       messages: [
-        {
-          role: "system",
-          content: systemPrompt
-        },
-        { role: "user", content: prompt }
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: prompt },
       ],
+      temperature: 0.7,
+      max_tokens: 4000,
     });
 
-    const response = JSON.parse(completion.choices[0].message.content);
+    if (!completion.choices || !completion.choices[0] || !completion.choices[0].message) {
+      console.error('Некорректный ответ от OpenAI API');
+      throw new Error('Некорректный ответ от OpenAI API');
+    }
 
-    // Сохраняем файлы и запускаем развертывание
-    if (response.files && response.files.length > 0) {
+    let response;
+    try {
+      response = JSON.parse(completion.choices[0].message.content);
+      console.log('Получен ответ от OpenAI:', response);
+    } catch (error) {
+      console.error('Ошибка парсинга JSON ответа:', error);
+      throw new Error('Некорректный формат ответа от OpenAI');
+    }
+
+    // Валидация структуры ответа
+    if (!response.files || !Array.isArray(response.files) || !response.description) {
+      throw new Error('Некорректная структура ответа от OpenAI');
+    }
+
+    // Сохраняем файлы
+    if (response.files.length > 0) {
+      console.log('Сохраняем файлы...');
       for (const file of response.files) {
+        if (!file.path || !file.content) {
+          console.error('Некорректная структура файла:', file);
+          continue;
+        }
+
         const filePath = `${userId}/${file.path}`;
-        
-        // Загружаем файл в Storage
-        const { error: uploadError } = await supabase.storage
-          .from('project_files')
-          .upload(filePath, file.content, {
-            contentType: 'text/plain',
-            upsert: true
-          });
 
-        if (uploadError) throw uploadError;
+        if (file.type === 'delete') {
+          const { error: deleteError } = await supabase.storage
+            .from('project_files')
+            .remove([filePath]);
 
-        // Сохраняем метаданные файла
-        const { error: fileError } = await supabase
-          .from('files')
-          .insert({
-            user_id: userId,
-            filename: file.path.split('/').pop(),
-            file_path: filePath,
-            content_type: 'text/plain',
-            size: Buffer.byteLength(file.content, 'utf8'),
-            content: file.content
-          });
+          if (deleteError) {
+            console.error('Ошибка при удалении файла:', deleteError);
+            continue;
+          }
+        } else {
+          const { error: uploadError } = await supabase.storage
+            .from('project_files')
+            .upload(filePath, file.content, {
+              contentType: 'text/plain',
+              upsert: true,
+            });
 
-        if (fileError) throw fileError;
+          if (uploadError) {
+            console.error('Ошибка при загрузке файла в Storage:', uploadError);
+            continue;
+          }
+
+          const { error: fileError } = await supabase
+            .from('files')
+            .insert({
+              user_id: userId,
+              filename: path.basename(file.path),
+              file_path: filePath,
+              content_type: 'text/plain',
+              size: Buffer.byteLength(file.content, 'utf8'),
+              content: file.content,
+            });
+
+          if (fileError) {
+            console.error('Ошибка при сохранении метаданных файла:', fileError);
+            continue;
+          }
+        }
       }
-
-      // Запускаем процесс развертывания
-      await fetch(`${process.env.BACKEND_URL}/api/deploy`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId,
-          files: response.files,
-          framework
-        })
-      });
     }
 
     // Сохраняем ответ ИИ в историю чата
+    console.log('Сохраняем ответ ИИ в историю чата...');
     const { error: aiChatError } = await supabase
       .from('chat_history')
       .insert({
         user_id: userId,
         prompt: response.description,
-        is_ai: true
+        is_ai: true,
       });
 
-    if (aiChatError) throw aiChatError;
+    if (aiChatError) {
+      console.error('Ошибка при сохранении ответа ИИ в chat_history:', aiChatError);
+      throw aiChatError;
+    }
 
-    res.json(response);
+    console.log('Успешно обработан запрос');
+    res.json({
+      ...response,
+      success: true,
+    });
   } catch (error) {
     console.error('Error:', error);
-    res.status(500).json({ error: 'Failed to process prompt' });
+    res.status(500).json({
+      error: 'Ошибка при обработке запроса',
+      details: error.message,
+    });
   }
 };

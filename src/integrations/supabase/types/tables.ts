@@ -67,6 +67,10 @@ export interface FilesTable {
     id: string
     size: number | null
     user_id: string | null
+    version: number | null
+    previous_versions: FileVersion[] | null
+    last_modified: string | null
+    modified_by: string | null
   }
   Insert: {
     content?: string | null
@@ -77,6 +81,10 @@ export interface FilesTable {
     id?: string
     size?: number | null
     user_id?: string | null
+    version?: number | null
+    previous_versions?: FileVersion[] | null
+    last_modified?: string | null
+    modified_by?: string | null
   }
   Update: {
     content?: string | null
@@ -87,8 +95,19 @@ export interface FilesTable {
     id?: string
     size?: number | null
     user_id?: string | null
+    version?: number | null
+    previous_versions?: FileVersion[] | null
+    last_modified?: string | null
+    modified_by?: string | null
   }
   Relationships: []
+}
+
+export interface FileVersion {
+  version: number;
+  content: string;
+  modified_at: string;
+  modified_by: string;
 }
 
 export interface ProfilesTable {
