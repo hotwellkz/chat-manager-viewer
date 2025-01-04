@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { ContainerMetrics } from "./ContainerMetrics";
+import { ContainerMetricsChart } from "./ContainerMetricsChart";
 
 interface ContainerStatusProps {
   containerId: string;
@@ -106,6 +107,7 @@ export const ContainerStatus = ({ containerId }: ContainerStatusProps) => {
           {status === 'creating' && 'Создается'}
           {status === 'error' && 'Ошибка'}
           {status === 'pending' && 'Ожидание'}
+          {status === 'warning' && 'Предупреждение'}
         </Badge>
         {url && status === 'running' && (
           <a 
@@ -120,7 +122,10 @@ export const ContainerStatus = ({ containerId }: ContainerStatusProps) => {
       </div>
       
       {status === 'running' && (
-        <ContainerMetrics containerId={containerId} />
+        <>
+          <ContainerMetrics containerId={containerId} />
+          <ContainerMetricsChart containerId={containerId} />
+        </>
       )}
     </div>
   );
