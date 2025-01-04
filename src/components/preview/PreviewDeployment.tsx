@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { ContainerStatus } from "../ContainerStatus";
 import { useToast } from "@/hooks/use-toast";
 import { DeploymentUrl } from "./deployment/DeploymentUrl";
 import { DeploymentStatus } from "./deployment/DeploymentStatus";
@@ -19,7 +18,14 @@ export const PreviewDeployment = ({ onError }: PreviewDeploymentProps) => {
 
   useEffect(() => {
     fetchLatestDeployment();
-    const channel = subscribeToDeploymentUpdates();
+    let channel: RealtimeChannel | null = null;
+    
+    const setupChannel = async () => {
+      channel = await subscribeToDeploymentUpdates();
+    };
+    
+    setupChannel();
+
     return () => {
       if (channel) {
         supabase.removeChannel(channel);
