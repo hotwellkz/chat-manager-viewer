@@ -2,3 +2,6 @@ project_id = "xbvjposgjusjngetlpfa"
 
 [functions.github-integration]
 verify_jwt = true
+
+[functions.prepare-deployment]
+verify_jwt = true
