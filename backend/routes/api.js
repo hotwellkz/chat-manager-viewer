@@ -17,7 +17,7 @@ router.post('/deploy', handleDeployment);
 
 // Docker контейнеры
 router.post('/containers', createContainer);
-router.get('/containers/:containerId', getContainerStatus);
+router.get('/containers/:containerId/status', getContainerStatus);
 router.delete('/containers/:containerId', deleteContainer);
 
 export default router;
