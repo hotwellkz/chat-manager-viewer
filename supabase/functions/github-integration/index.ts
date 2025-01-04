@@ -1,5 +1,5 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,12 +13,12 @@ interface GitHubAuthResponse {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
+    // Создаем клиент Supabase с сервисной ролью
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -37,7 +37,9 @@ serve(async (req) => {
       )
     }
 
-    if (action === 'auth') {
+    if (action === 'auth' && code) {
+      console.log('Получен код авторизации:', code)
+      
       // Обмен кода на токен доступа
       const params = new URLSearchParams({
         client_id: Deno.env.get('GITHUB_CLIENT_ID') ?? '',
@@ -55,7 +57,9 @@ serve(async (req) => {
         }
       )
 
+      console.log('Ответ от GitHub:', response.status)
       const data: GitHubAuthResponse = await response.json()
+      console.log('Данные токена:', data)
 
       if (data.access_token) {
         // Получаем информацию о пользователе GitHub
@@ -65,11 +69,20 @@ serve(async (req) => {
           },
         })
         const userData = await userResponse.json()
+        console.log('Данные пользователя GitHub:', userData)
 
-        // Получаем текущего пользователя Supabase
-        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        // Получаем текущего пользователя Supabase из токена
+        const authHeader = req.headers.get('Authorization')
+        if (!authHeader) {
+          throw new Error('No authorization header')
+        }
+
+        const { data: { user }, error: authError } = await supabase.auth.getUser(
+          authHeader.replace('Bearer ', '')
+        )
         
         if (authError || !user) {
+          console.error('Ошибка получения пользователя:', authError)
           throw new Error('Unauthorized')
         }
 
@@ -85,6 +98,7 @@ serve(async (req) => {
           })
 
         if (dbError) {
+          console.error('Ошибка сохранения в БД:', dbError)
           throw dbError
         }
 
@@ -97,7 +111,7 @@ serve(async (req) => {
       }
     }
 
-    throw new Error('Invalid action')
+    throw new Error('Invalid action or missing code')
   } catch (error) {
     console.error('Error:', error)
     return new Response(
