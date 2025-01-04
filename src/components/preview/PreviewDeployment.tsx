@@ -4,34 +4,85 @@ import { ContainerStatus } from "../ContainerStatus";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { 
+  Loader2, 
+  CheckCircle2, 
+  AlertCircle,
+  Package,
+  Hammer,
+  Upload,
+  Rocket
+} from "lucide-react";
 
 interface PreviewDeploymentProps {
   onError: (error: string | null) => void;
 }
 
+type DeploymentStatus = 'pending' | 'preparing' | 'packaging' | 'building' | 'deploying' | 'deployed' | 'error';
+
+interface DeploymentStep {
+  status: DeploymentStatus;
+  icon: React.ReactNode;
+  label: string;
+  progress: number;
+}
+
 export const PreviewDeployment = ({ onError }: PreviewDeploymentProps) => {
   const [deploymentUrl, setDeploymentUrl] = useState<string | null>(null);
   const [containerId, setContainerId] = useState<string | null>(null);
-  const [deploymentStatus, setDeploymentStatus] = useState<string>('pending');
+  const [deploymentStatus, setDeploymentStatus] = useState<DeploymentStatus>('pending');
   const [progress, setProgress] = useState(0);
   const { toast } = useToast();
+
+  const deploymentSteps: Record<DeploymentStatus, DeploymentStep> = {
+    pending: {
+      status: 'pending',
+      icon: <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />,
+      label: 'Ожидание начала деплоя...',
+      progress: 0
+    },
+    preparing: {
+      status: 'preparing',
+      icon: <Package className="h-4 w-4 text-blue-500" />,
+      label: 'Подготовка файлов...',
+      progress: 20
+    },
+    packaging: {
+      status: 'packaging',
+      icon: <Package className="h-4 w-4 text-blue-500 animate-pulse" />,
+      label: 'Упаковка проекта...',
+      progress: 40
+    },
+    building: {
+      status: 'building',
+      icon: <Hammer className="h-4 w-4 text-yellow-500 animate-bounce" />,
+      label: 'Сборка проекта...',
+      progress: 60
+    },
+    deploying: {
+      status: 'deploying',
+      icon: <Upload className="h-4 w-4 text-purple-500 animate-pulse" />,
+      label: 'Развертывание...',
+      progress: 80
+    },
+    deployed: {
+      status: 'deployed',
+      icon: <Rocket className="h-4 w-4 text-green-500" />,
+      label: 'Проект успешно развернут',
+      progress: 100
+    },
+    error: {
+      status: 'error',
+      icon: <AlertCircle className="h-4 w-4 text-destructive" />,
+      label: 'Ошибка при развертывании',
+      progress: 0
+    }
+  };
 
   useEffect(() => {
     fetchLatestDeployment();
     subscribeToDeploymentUpdates();
   }, []);
-
-  const getProgressByStatus = (status: string): number => {
-    switch (status) {
-      case 'packaging': return 25;
-      case 'building': return 50;
-      case 'deploying': return 75;
-      case 'deployed': return 100;
-      case 'error': return 0;
-      default: return 0;
-    }
-  };
 
   const subscribeToDeploymentUpdates = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -50,9 +101,12 @@ export const PreviewDeployment = ({ onError }: PreviewDeploymentProps) => {
         (payload) => {
           if (payload.new) {
             const { status, project_url } = payload.new as any;
-            setDeploymentStatus(status);
-            setProgress(getProgressByStatus(status));
-            if (project_url) setDeploymentUrl(project_url);
+            setDeploymentStatus(status as DeploymentStatus);
+            setProgress(deploymentSteps[status as DeploymentStatus].progress);
+            
+            if (project_url) {
+              setDeploymentUrl(project_url);
+            }
 
             if (status === 'deployed') {
               toast({
@@ -97,8 +151,8 @@ export const PreviewDeployment = ({ onError }: PreviewDeploymentProps) => {
 
       if (deployment) {
         setDeploymentUrl(deployment.project_url);
-        setDeploymentStatus(deployment.status);
-        setProgress(getProgressByStatus(deployment.status));
+        setDeploymentStatus(deployment.status as DeploymentStatus);
+        setProgress(deploymentSteps[deployment.status as DeploymentStatus].progress);
         
         const { data: container, error: containerError } = await supabase
           .from('docker_containers')
@@ -124,33 +178,7 @@ export const PreviewDeployment = ({ onError }: PreviewDeploymentProps) => {
     }
   };
 
-  const getStatusIcon = () => {
-    switch (deploymentStatus) {
-      case 'deployed':
-        return <CheckCircle2 className="h-4 w-4 text-green-500" />;
-      case 'error':
-        return <AlertCircle className="h-4 w-4 text-destructive" />;
-      case 'pending':
-      case 'packaging':
-      case 'building':
-      case 'deploying':
-        return <Loader2 className="h-4 w-4 animate-spin" />;
-      default:
-        return null;
-    }
-  };
-
-  const getStatusMessage = () => {
-    switch (deploymentStatus) {
-      case 'pending': return 'Ожидание развертывания...';
-      case 'packaging': return 'Подготовка файлов...';
-      case 'building': return 'Сборка проекта...';
-      case 'deploying': return 'Развертывание...';
-      case 'deployed': return 'Проект успешно развернут';
-      case 'error': return 'Ошибка при развертывании';
-      default: return 'Неизвестный статус';
-    }
-  };
+  const currentStep = deploymentSteps[deploymentStatus];
 
   return (
     <div className="flex flex-col gap-4">
@@ -161,28 +189,29 @@ export const PreviewDeployment = ({ onError }: PreviewDeploymentProps) => {
           rel="noopener noreferrer"
           className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-2"
         >
-          {getStatusIcon()}
+          <Rocket className="h-4 w-4" />
           {deploymentUrl}
         </a>
       )}
 
-      {deploymentStatus !== 'deployed' && deploymentStatus !== 'error' && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-sm">
-            {getStatusIcon()}
-            <span>{getStatusMessage()}</span>
-          </div>
-          <Progress value={progress} className="h-2" />
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 text-sm">
+          {currentStep.icon}
+          <span>{currentStep.label}</span>
         </div>
-      )}
 
-      {deploymentStatus === 'error' && (
-        <Alert variant="destructive">
-          <AlertDescription>
-            Произошла ошибка при развертывании проекта. Пожалуйста, попробуйте снова.
-          </AlertDescription>
-        </Alert>
-      )}
+        {deploymentStatus !== 'deployed' && deploymentStatus !== 'error' && (
+          <Progress value={progress} className="h-2" />
+        )}
+
+        {deploymentStatus === 'error' && (
+          <Alert variant="destructive">
+            <AlertDescription>
+              Произошла ошибка при развертывании проекта. Пожалуйста, попробуйте снова.
+            </AlertDescription>
+          </Alert>
+        )}
+      </div>
 
       {containerId && (
         <ContainerStatus containerId={containerId} />
