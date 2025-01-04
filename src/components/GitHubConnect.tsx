@@ -31,11 +31,16 @@ export const GitHubConnect = () => {
 
   const handleConnect = async () => {
     try {
-      const { data } = await supabase.functions.invoke('github-integration', {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('No active session');
+      }
+
+      const { data, error } = await supabase.functions.invoke('github-integration', {
         body: { action: 'get-client-id' }
       });
 
-      if (!data?.clientId) {
+      if (error || !data?.clientId) {
         throw new Error('Failed to get GitHub client ID');
       }
 
