@@ -14,7 +14,7 @@ serve(async (req) => {
   try {
     const { containerId, metrics } = await req.json()
     console.log('Получены метрики:', { containerId, metrics })
-
+    
     if (!containerId || !metrics) {
       throw new Error('Container ID and metrics are required')
     }
@@ -36,11 +36,14 @@ serve(async (req) => {
       })
 
     if (metricsError) {
+      console.error('Ошибка сохранения метрик:', metricsError)
       throw metricsError
     }
 
     // Проверяем превышение лимитов
     if (metrics.cpu > 80 || metrics.memory > metrics.memoryLimit * 0.9) {
+      console.warn(`Высокая нагрузка на контейнер ${containerId}`)
+      
       const { error: updateError } = await supabase
         .from('docker_containers')
         .update({ 
@@ -50,6 +53,7 @@ serve(async (req) => {
         .eq('id', containerId)
 
       if (updateError) {
+        console.error('Ошибка обновления статуса:', updateError)
         throw updateError
       }
     }
