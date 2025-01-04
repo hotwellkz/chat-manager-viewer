@@ -4,6 +4,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Max-Age': '86400'
 }
 
 serve(async (req) => {
@@ -19,7 +21,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Получаем все контейнеры, которые не обновлялись более 24 часов
+    // Получаем неактивные контейнеры
     const { data: inactiveContainers, error: fetchError } = await supabase
       .from('docker_containers')
       .select('*')
@@ -27,6 +29,7 @@ serve(async (req) => {
       .lt('updated_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
 
     if (fetchError) {
+      console.error('Error fetching containers:', fetchError)
       throw fetchError
     }
 
@@ -47,7 +50,7 @@ serve(async (req) => {
       )
     }
 
-    // Обновляем статус контейнеров на 'stopped'
+    // Обновляем статус контейнеров
     const { error: updateError } = await supabase
       .from('docker_containers')
       .update({ 
@@ -57,6 +60,7 @@ serve(async (req) => {
       .in('id', inactiveContainers.map(c => c.id))
 
     if (updateError) {
+      console.error('Error updating containers:', updateError)
       throw updateError
     }
 
@@ -88,7 +92,7 @@ serve(async (req) => {
           ...corsHeaders,
           'Content-Type': 'application/json'
         },
-        status: 400
+        status: 500
       }
     )
   }

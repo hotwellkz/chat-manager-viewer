@@ -4,11 +4,19 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Max-Age': '86400'
 }
 
 serve(async (req) => {
+  // Обработка CORS preflight запросов
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { 
+      headers: corsHeaders 
+    })
+  }
+
   const upgrade = req.headers.get('upgrade') || ''
-  
   if (upgrade.toLowerCase() != 'websocket') {
     return new Response('Expected WebSocket connection', { 
       status: 400,
@@ -16,7 +24,6 @@ serve(async (req) => {
     })
   }
 
-  // Получаем JWT из URL параметров
   const url = new URL(req.url)
   const jwt = url.searchParams.get('jwt')
   if (!jwt) {
@@ -31,7 +38,6 @@ serve(async (req) => {
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   )
 
-  // Проверяем токен
   const { error: authError, data: { user } } = await supabase.auth.getUser(jwt)
   if (authError || !user) {
     console.error('Auth error:', authError)
@@ -46,7 +52,6 @@ serve(async (req) => {
   socket.onopen = async () => {
     console.log('Client connected')
 
-    // Подписываемся на изменения в таблице docker_containers
     const channel = supabase.channel('container-updates')
       .on(
         'postgres_changes',
