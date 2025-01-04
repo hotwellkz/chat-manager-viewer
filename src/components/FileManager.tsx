@@ -13,6 +13,7 @@ import {
   Plus,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { FilePackager } from "./FilePackager";
 
 interface FileNode {
   id: string;
@@ -224,9 +225,12 @@ export const FileManager = () => {
     <div className="h-full flex flex-col border-l border-border">
       <div className="p-2 border-b border-border flex justify-between items-center">
         <h2 className="font-semibold">Файлы</h2>
-        <Button size="icon" variant="ghost">
-          <Plus className="h-4 w-4" />
-        </Button>
+        <div className="flex gap-2">
+          <FilePackager />
+          <Button size="icon" variant="ghost">
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
       <ScrollArea className="flex-1">
         {files.map((node) => renderNode(node))}
