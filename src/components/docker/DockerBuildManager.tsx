@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Package2, Loader2 } from "lucide-react";
+import { Package2, Loader2, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Progress } from "../ui/progress";
 import { Button } from "../ui/button";
+import { Card } from "../ui/card";
 
 interface BuildMetadata {
   version: string;
@@ -12,18 +13,46 @@ interface BuildMetadata {
   lastModified: string;
 }
 
+interface BuildStatus {
+  stage: 'idle' | 'preparing' | 'packaging' | 'building' | 'deploying' | 'completed' | 'error';
+  message: string;
+  progress: number;
+}
+
+const STAGES = {
+  idle: { progress: 0, message: 'Готов к сборке' },
+  preparing: { progress: 10, message: 'Подготовка к сборке...' },
+  packaging: { progress: 30, message: 'Упаковка файлов проекта...' },
+  building: { progress: 60, message: 'Сборка Docker образа...' },
+  deploying: { progress: 80, message: 'Развертывание контейнера...' },
+  completed: { progress: 100, message: 'Сборка завершена успешно!' },
+  error: { progress: 0, message: 'Произошла ошибка при сборке' }
+};
+
 export const DockerBuildManager = () => {
   const [isBuilding, setIsBuilding] = useState(false);
-  const [buildStatus, setBuildStatus] = useState<string | null>(null);
-  const [progress, setProgress] = useState(0);
+  const [buildStatus, setBuildStatus] = useState<BuildStatus>({ 
+    stage: 'idle', 
+    message: STAGES.idle.message,
+    progress: STAGES.idle.progress 
+  });
   const [metadata, setMetadata] = useState<BuildMetadata | null>(null);
+  const [deployedUrl, setDeployedUrl] = useState<string | null>(null);
   const { toast } = useToast();
+
+  const updateBuildStatus = (stage: BuildStatus['stage']) => {
+    const stageInfo = STAGES[stage];
+    setBuildStatus({
+      stage,
+      message: stageInfo.message,
+      progress: stageInfo.progress
+    });
+  };
 
   const handleBuild = async () => {
     try {
       setIsBuilding(true);
-      setProgress(10);
-      setBuildStatus("Подготовка к сборке...");
+      updateBuildStatus('preparing');
       
       const { data: { user } } = await supabase.auth.getUser();
       
@@ -31,8 +60,7 @@ export const DockerBuildManager = () => {
         throw new Error('Пользователь не авторизован');
       }
 
-      setProgress(25);
-      setBuildStatus("Инициализация сборки...");
+      updateBuildStatus('packaging');
       const response = await supabase.functions.invoke('prepare-deployment', {
         body: { userId: user.id }
       });
@@ -41,15 +69,12 @@ export const DockerBuildManager = () => {
         throw new Error(response.data?.error || 'Ошибка при подготовке деплоя');
       }
 
-      setProgress(40);
-      setBuildStatus("Сборка Docker образа...");
-      
-      // Сохраняем метаданные проекта
       setMetadata(response.data.metadata);
+      updateBuildStatus('building');
       
       toast({
-        title: "Успешно",
-        description: "Сборка Docker образа запущена",
+        title: "Сборка запущена",
+        description: "Началась сборка Docker образа",
       });
 
       // Проверяем статус сборки каждые 5 секунд
@@ -69,25 +94,22 @@ export const DockerBuildManager = () => {
 
         switch (deployData.status) {
           case 'packaging':
-            setProgress(60);
-            setBuildStatus("Упаковка файлов проекта...");
+            updateBuildStatus('packaging');
             break;
           case 'building':
-            setProgress(75);
-            setBuildStatus("Сборка Docker образа...");
+            updateBuildStatus('building');
             break;
           case 'deploying':
-            setProgress(90);
-            setBuildStatus("Развертывание контейнера...");
+            updateBuildStatus('deploying');
             break;
           case 'deployed':
             clearInterval(checkBuildStatus);
-            setProgress(100);
-            setBuildStatus("Сборка завершена успешно!");
+            updateBuildStatus('completed');
+            setDeployedUrl(deployData.project_url);
             setIsBuilding(false);
             toast({
               title: "Готово",
-              description: `Docker образ успешно собран и развернут по адресу: ${deployData.project_url}`,
+              description: `Docker образ успешно собран и развернут`,
             });
             break;
           case 'error':
@@ -98,54 +120,66 @@ export const DockerBuildManager = () => {
 
     } catch (error) {
       console.error('Build error:', error);
-      setBuildStatus("Произошла ошибка при сборке");
-      setProgress(0);
+      updateBuildStatus('error');
+      setIsBuilding(false);
       toast({
         variant: "destructive",
         title: "Ошибка",
         description: "Не удалось запустить сборку Docker образа",
       });
-    } finally {
-      setIsBuilding(false);
     }
   };
 
   return (
-    <div className="flex flex-col gap-4 p-4 border rounded-lg">
+    <Card className="p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <Button
-          onClick={handleBuild}
-          disabled={isBuilding}
-          className="flex items-center gap-2"
-        >
-          {isBuilding ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Package2 className="h-4 w-4" />
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={handleBuild}
+            disabled={isBuilding}
+            className="flex items-center gap-2"
+          >
+            {isBuilding ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Package2 className="h-4 w-4" />
+            )}
+            {isBuilding ? 'Сборка...' : 'Собрать образ'}
+          </Button>
+          
+          {metadata && (
+            <span className="text-sm text-muted-foreground">
+              Версия: {metadata.version}
+            </span>
           )}
-          {isBuilding ? 'Сборка...' : 'Собрать образ'}
-        </Button>
-        
-        {metadata && (
-          <span className="text-sm text-muted-foreground">
-            Версия: {metadata.version}
-          </span>
+        </div>
+
+        {deployedUrl && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => window.open(deployedUrl, '_blank')}
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Открыть проект
+          </Button>
         )}
       </div>
       
-      {buildStatus && (
+      {buildStatus.stage !== 'idle' && (
         <div className="space-y-2">
-          <Alert>
+          <Alert variant={buildStatus.stage === 'error' ? 'destructive' : 'default'}>
             <AlertDescription>
-              {buildStatus}
+              {buildStatus.message}
             </AlertDescription>
           </Alert>
           
           {isBuilding && (
-            <Progress value={progress} className="h-2" />
+            <Progress value={buildStatus.progress} className="h-2" />
           )}
         </div>
       )}
-    </div>
+    </Card>
   );
 };
