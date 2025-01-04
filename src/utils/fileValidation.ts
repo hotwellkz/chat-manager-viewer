@@ -1,6 +1,13 @@
 interface ValidationResult {
   isValid: boolean;
   errors: string[];
+  warnings: string[];
+  details: {
+    syntaxValid: boolean;
+    structureValid: boolean;
+    securityValid: boolean;
+    sizeValid: boolean;
+  };
 }
 
 interface FileMetadata {
@@ -10,12 +17,16 @@ interface FileMetadata {
   size: number;
 }
 
-// Проверка синтаксиса JavaScript/TypeScript
+// Проверка синтаксиса кода
 const validateSyntax = (content: string, filename: string): string[] => {
   const errors: string[] = [];
+  
   try {
-    // Базовая проверка синтаксиса через Function
-    new Function(content);
+    if (filename.endsWith('.ts') || filename.endsWith('.tsx') || filename.endsWith('.js') || filename.endsWith('.jsx')) {
+      new Function(content);
+    } else if (filename.endsWith('.json')) {
+      JSON.parse(content);
+    }
   } catch (error) {
     if (error instanceof Error) {
       errors.push(`Синтаксическая ошибка: ${error.message}`);
@@ -24,9 +35,8 @@ const validateSyntax = (content: string, filename: string): string[] => {
 
   // Дополнительные проверки для TypeScript
   if (filename.endsWith('.ts') || filename.endsWith('.tsx')) {
-    // Проверяем наличие типов для параметров функций
-    if (content.includes('function') && !content.includes(': ')) {
-      errors.push('Отсутствует типизация параметров функций');
+    if (!content.includes('interface') && !content.includes('type') && content.includes('function')) {
+      errors.push('Рекомендуется добавить типизацию для функций');
     }
   }
 
@@ -60,6 +70,28 @@ const validateStructure = (file: FileMetadata): string[] => {
   return errors;
 };
 
+// Проверка безопасности
+const validateSecurity = (content: string): string[] => {
+  const errors: string[] = [];
+  
+  const sensitivePatterns = [
+    { pattern: /api[_-]?key/i, message: 'Обнаружен API ключ' },
+    { pattern: /auth[_-]?token/i, message: 'Обнаружен токен авторизации' },
+    { pattern: /password/i, message: 'Обнаружен пароль' },
+    { pattern: /secret/i, message: 'Обнаружены секретные данные' },
+    { pattern: /private[_-]?key/i, message: 'Обнаружен приватный ключ' },
+    { pattern: /(\b|\d{4}[ -]?\d{4}[ -]?\d{4}[ -]?\d{4}\b)/, message: 'Обнаружен номер карты' },
+  ];
+
+  for (const { pattern, message } of sensitivePatterns) {
+    if (pattern.test(content)) {
+      errors.push(`Предупреждение безопасности: ${message}`);
+    }
+  }
+
+  return errors;
+};
+
 // Проверка метаданных
 const validateMetadata = (file: FileMetadata): string[] => {
   const errors: string[] = [];
@@ -73,7 +105,7 @@ const validateMetadata = (file: FileMetadata): string[] => {
   }
 
   // Проверка наличия содержимого
-  if (!file.content) {
+  if (!file.content.trim()) {
     errors.push('Файл пуст');
   }
 
@@ -89,45 +121,36 @@ const validateMetadata = (file: FileMetadata): string[] => {
     }
   }
 
-  // Проверка на наличие конфиденциальных данных
-  const sensitivePatterns = [
-    /api[_-]?key/i,
-    /auth[_-]?token/i,
-    /password/i,
-    /secret/i,
-  ];
-
-  for (const pattern of sensitivePatterns) {
-    if (pattern.test(file.content)) {
-      errors.push('Файл может содержать конфиденциальные данные');
-      break;
-    }
-  }
-
   return errors;
 };
 
 export const validateFile = (file: FileMetadata): ValidationResult => {
   console.log('Начало валидации файла:', file.path);
   
+  const syntaxErrors = validateSyntax(file.content, file.name);
   const structureErrors = validateStructure(file);
+  const securityErrors = validateSecurity(file.content);
   const metadataErrors = validateMetadata(file);
-  
-  // Проверяем синтаксис только для JavaScript/TypeScript файлов
-  const syntaxErrors = file.name.match(/\.(js|jsx|ts|tsx)$/) 
-    ? validateSyntax(file.content, file.name)
-    : [];
 
-  const allErrors = [...structureErrors, ...metadataErrors, ...syntaxErrors];
+  const allErrors = [...structureErrors, ...syntaxErrors, ...metadataErrors];
+  const warnings = [...securityErrors];
 
   console.log('Результаты валидации:', {
+    syntaxErrors,
     structureErrors,
-    metadataErrors,
-    syntaxErrors
+    securityErrors,
+    metadataErrors
   });
 
   return {
     isValid: allErrors.length === 0,
-    errors: allErrors
+    errors: allErrors,
+    warnings,
+    details: {
+      syntaxValid: syntaxErrors.length === 0,
+      structureValid: structureErrors.length === 0,
+      securityValid: securityErrors.length === 0,
+      sizeValid: !structureErrors.some(error => error.includes('размер файла'))
+    }
   };
 };
