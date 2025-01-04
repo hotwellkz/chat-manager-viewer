@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
+import { Octokit } from "https://esm.sh/octokit@4.0.3"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,6 +26,20 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // Получаем информацию о контейнере пользователя
+    const { data: containers, error: containerError } = await supabase
+      .from('docker_containers')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+
+    if (containerError) {
+      console.error('Error fetching container info:', containerError)
+    }
+
+    const containerInfo = containers?.[0]
+
     // Получаем GitHub токен пользователя
     const { data: integration, error: integrationError } = await supabase
       .from('github_integrations')
@@ -36,17 +51,16 @@ serve(async (req) => {
       throw new Error('GitHub integration not found')
     }
 
-    // Создаем или обновляем файлы в GitHub
     const octokit = new Octokit({
       auth: integration.access_token
     })
 
-    // Получаем текущее содержимое репозитория
     const [owner, repo] = integration.repository_name.split('/')
     
     try {
       // Создаем новую ветку для изменений
-      const branchName = `update-${new Date().getTime()}`
+      const timestamp = new Date().getTime()
+      const branchName = `update-${timestamp}`
       
       // Получаем SHA последнего коммита в main
       const { data: ref } = await octokit.rest.git.getRef({
@@ -55,7 +69,6 @@ serve(async (req) => {
         ref: 'heads/main',
       })
       
-      // Создаем новую ветку
       await octokit.rest.git.createRef({
         owner,
         repo,
@@ -63,26 +76,49 @@ serve(async (req) => {
         sha: ref.object.sha,
       })
 
+      // Формируем расширенное сообщение коммита
+      const extendedMessage = `${commitMessage || 'Update from Lovable'}
+
+Container Info:
+${containerInfo ? `
+- Status: ${containerInfo.status}
+- URL: ${containerInfo.container_url}
+- Framework: ${containerInfo.framework}
+- Port: ${containerInfo.port}
+` : 'No container info available'}
+
+Files changed:
+${files.map(f => `- ${f.path}`).join('\n')}
+
+Timestamp: ${new Date().toISOString()}
+`
+
       // Создаем коммит с изменениями
       for (const file of files) {
-        await octokit.rest.repos.createOrUpdateFileContents({
-          owner,
-          repo,
-          path: file.path,
-          message: commitMessage || 'Update from Lovable',
-          content: btoa(file.content),
-          branch: branchName,
-        })
+        try {
+          await octokit.rest.repos.createOrUpdateFileContents({
+            owner,
+            repo,
+            path: file.path,
+            message: extendedMessage,
+            content: btoa(file.content),
+            branch: branchName,
+          })
+          console.log(`Successfully updated file: ${file.path}`)
+        } catch (error) {
+          console.error(`Error updating file ${file.path}:`, error)
+          throw error
+        }
       }
 
-      // Создаем Pull Request
+      // Создаем Pull Request с детальным описанием
       const { data: pr } = await octokit.rest.pulls.create({
         owner,
         repo,
         title: commitMessage || 'Update from Lovable',
         head: branchName,
         base: 'main',
-        body: 'Автоматическое обновление из Lovable',
+        body: extendedMessage,
       })
 
       // Обновляем статус синхронизации
@@ -99,7 +135,8 @@ serve(async (req) => {
         JSON.stringify({
           success: true,
           message: 'Changes synced to GitHub',
-          prUrl: pr.html_url
+          prUrl: pr.html_url,
+          branch: branchName
         }),
         {
           headers: {
@@ -117,7 +154,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message
+        error: error.message,
+        details: error.stack
       }),
       {
         headers: {
