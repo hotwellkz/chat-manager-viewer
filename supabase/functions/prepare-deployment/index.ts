@@ -7,7 +7,6 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -38,37 +37,41 @@ serve(async (req) => {
       throw new Error('No files found for deployment')
     }
 
-    // Создаем архив в памяти
+    // Создаем структуру проекта в памяти
     const encoder = new TextEncoder()
-    const zipParts = []
+    const projectStructure = {
+      files: [],
+      metadata: {
+        filename: "project.zip",
+        version: "1.0.2",
+        containerId: "abc123",
+        lastModified: new Date().toISOString()
+      }
+    }
 
-    // Добавляем каждый файл в архив
+    // Добавляем каждый файл в структуру проекта
     for (const file of files) {
       const fileContent = encoder.encode(file.content)
-      zipParts.push({
+      projectStructure.files.push({
         name: file.file_path,
-        content: fileContent
+        content: Array.from(fileContent), // Конвертируем в обычный массив для JSON
+        size: file.size,
+        type: file.content_type
       })
     }
 
-    // Создаем ZIP архив как Uint8Array
-    const zipContent = new Uint8Array(
-      zipParts.reduce((acc, part) => {
-        const header = encoder.encode(`File: ${part.name}\n`)
-        const content = part.content
-        const separator = encoder.encode('\n---\n')
-        return [...acc, ...header, ...content, ...separator]
-      }, [])
-    )
+    // Создаем JSON представление проекта
+    const projectJson = JSON.stringify(projectStructure, null, 2)
+    const projectData = encoder.encode(projectJson)
 
-    // Сохраняем ZIP в storage
+    // Сохраняем проект в storage
     const timestamp = new Date().toISOString()
-    const zipPath = `${userId}/deployments/${timestamp}.zip`
+    const projectPath = `${userId}/deployments/${timestamp}/project.json`
 
     const { error: uploadError } = await supabase.storage
       .from('project_files')
-      .upload(zipPath, zipContent, {
-        contentType: 'application/zip',
+      .upload(projectPath, projectData, {
+        contentType: 'application/json',
         upsert: true
       })
 
@@ -76,10 +79,10 @@ serve(async (req) => {
       throw uploadError
     }
 
-    // Получаем публичную ссылку на ZIP
+    // Получаем публичную ссылку на проект
     const { data: { publicUrl }, error: urlError } = await supabase.storage
       .from('project_files')
-      .getPublicUrl(zipPath)
+      .getPublicUrl(projectPath)
 
     if (urlError) {
       throw urlError
@@ -98,11 +101,14 @@ serve(async (req) => {
       throw updateError
     }
 
+    console.log('Project packaged successfully:', projectPath)
+
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Files packaged successfully',
-        zipUrl: publicUrl
+        message: 'Project packaged successfully',
+        projectUrl: publicUrl,
+        metadata: projectStructure.metadata
       }),
       { 
         headers: { 
