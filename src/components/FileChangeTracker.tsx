@@ -91,7 +91,7 @@ export const FileChangeTracker = () => {
 
         if (currentFile) {
           const newVersion = (currentFile.version || 1) + 1;
-          const previousVersions = currentFile.previous_versions || [];
+          const previousVersions = currentFile.previous_versions as FileVersion[] || [];
           
           previousVersions.push({
             version: currentFile.version || 1,
