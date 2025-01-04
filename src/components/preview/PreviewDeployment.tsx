@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { DeploymentUrl } from "./deployment/DeploymentUrl";
 import { DeploymentStatus } from "./deployment/DeploymentStatus";
 import { RealtimeChannel } from "@supabase/supabase-js";
+import { ContainerStatus } from "../ContainerStatus";
 
 interface PreviewDeploymentProps {
   onError: (error: string | null) => void;
