@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Badge } from "@/components/ui/badge";
-import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Loader2, Play, Square, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { ContainerMetrics } from "./ContainerMetrics";
 import { ContainerMetricsChart } from "./ContainerMetricsChart";
+import { useQuery } from "@tanstack/react-query";
 
 interface ContainerStatusProps {
   containerId: string;
@@ -24,7 +26,6 @@ export const ContainerStatus = ({ containerId }: ContainerStatusProps) => {
           return;
         }
 
-        // Подключаемся к WebSocket с JWT для аутентификации
         const wsUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/container-status?jwt=${session.access_token}`;
         const ws = new WebSocket(wsUrl);
 
@@ -62,7 +63,6 @@ export const ContainerStatus = ({ containerId }: ContainerStatusProps) => {
       }
     };
 
-    // Получаем начальный статус
     const fetchInitialStatus = async () => {
       try {
         const { data: container, error } = await supabase
@@ -97,6 +97,23 @@ export const ContainerStatus = ({ containerId }: ContainerStatusProps) => {
     };
   }, [containerId]);
 
+  const handleDelete = async () => {
+    try {
+      const response = await fetch(`https://backendlovable006.onrender.com/api/containers/${containerId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Ошибка при удалении контейнера');
+      }
+
+      toast.success('Контейнер успешно удаляется');
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Ошибка при удалении контейнера');
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'running':
@@ -104,11 +121,33 @@ export const ContainerStatus = ({ containerId }: ContainerStatusProps) => {
       case 'error':
         return 'bg-red-500';
       case 'creating':
+      case 'starting':
         return 'bg-yellow-500';
       case 'warning':
         return 'bg-orange-500';
+      case 'stopping':
+        return 'bg-blue-500';
       default:
         return 'bg-gray-500';
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'running':
+        return 'Запущен';
+      case 'creating':
+        return 'Создается';
+      case 'starting':
+        return 'Запускается';
+      case 'error':
+        return 'Ошибка';
+      case 'stopping':
+        return 'Останавливается';
+      case 'initializing':
+        return 'Инициализация';
+      default:
+        return 'Ожидание';
     }
   };
 
@@ -123,14 +162,23 @@ export const ContainerStatus = ({ containerId }: ContainerStatusProps) => {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-4">
         <Badge className={getStatusColor(status)}>
-          {status === 'running' && 'Запущен'}
-          {status === 'creating' && 'Создается'}
-          {status === 'error' && 'Ошибка'}
-          {status === 'pending' && 'Ожидание'}
-          {status === 'warning' && 'Предупреждение'}
+          {getStatusText(status)}
         </Badge>
+        
+        {status === 'running' && (
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={handleDelete}
+            className="flex items-center gap-2"
+          >
+            <Trash2 className="h-4 w-4" />
+            Удалить
+          </Button>
+        )}
+        
         {url && status === 'running' && (
           <a 
             href={url} 
