@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Package2, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "../ui/alert";
 import { Progress } from "../ui/progress";
+import { Button } from "../ui/button";
 
 interface BuildMetadata {
   version: string;
