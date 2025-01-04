@@ -19,13 +19,12 @@ serve(async (req) => {
       throw new Error('Container ID and metrics are required')
     }
 
-    // Создаем клиент Supabase
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Сохраняем метрики в базу данных
+    // Сохраняем метрики
     const { error: metricsError } = await supabase
       .from('container_metrics')
       .insert({
@@ -37,25 +36,20 @@ serve(async (req) => {
       })
 
     if (metricsError) {
-      console.error('Ошибка при сохранении метрик:', metricsError)
       throw metricsError
     }
 
     // Проверяем превышение лимитов
     if (metrics.cpu > 80 || metrics.memory > metrics.memoryLimit * 0.9) {
-      console.warn(`Обнаружено высокое потребление ресурсов для контейнера ${containerId}`)
-      
-      // Обновляем статус контейнера
       const { error: updateError } = await supabase
         .from('docker_containers')
         .update({ 
           status: 'warning',
-          container_logs: `Высокое потребление ресурсов: CPU ${metrics.cpu}%, Память ${metrics.memory}MB`
+          container_logs: `Высокая нагрузка: CPU ${metrics.cpu}%, Память ${metrics.memory}MB`
         })
         .eq('id', containerId)
 
       if (updateError) {
-        console.error('Ошибка при обновлении статуса контейнера:', updateError)
         throw updateError
       }
     }
@@ -74,7 +68,7 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Ошибка:', error)
+    console.error('Error:', error)
     return new Response(
       JSON.stringify({ 
         success: false, 
