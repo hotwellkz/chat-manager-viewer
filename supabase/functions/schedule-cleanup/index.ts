@@ -12,25 +12,38 @@ serve(async (req) => {
   }
 
   try {
-    console.log('Запуск планировщика очистки контейнеров')
+    console.log('Настройка расписания очистки контейнеров')
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Создаем задачу в cron для запуска очистки каждый час
+    // Создаем задачу в cron для запуска очистки каждые 12 часов
     const { data, error } = await supabase.rpc('create_cleanup_schedule', {
-      schedule: '0 * * * *', // Каждый час
+      schedule: '0 */12 * * *', // Каждые 12 часов
       function_name: 'cleanup-inactive-containers'
     })
 
     if (error) throw error
 
+    // Добавляем запись в метрики для отслеживания
+    const { error: metricsError } = await supabase
+      .from('container_metrics')
+      .insert({
+        error_count: 0,
+        container_logs: 'Настроено расписание автоматической очистки'
+      })
+
+    if (metricsError) {
+      console.warn('Ошибка при сохранении метрик:', metricsError)
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Планировщик очистки успешно настроен',
+        message: 'Расписание очистки успешно настроено',
+        schedule: '0 */12 * * *',
         data 
       }),
       { 
@@ -53,7 +66,7 @@ serve(async (req) => {
           ...corsHeaders,
           'Content-Type': 'application/json'
         },
-        status: 400
+        status: 500
       }
     )
   }
