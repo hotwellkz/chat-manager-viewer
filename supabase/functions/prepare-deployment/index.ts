@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { zip } from "https://deno.land/x/zipjs/mod.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -39,15 +38,28 @@ serve(async (req) => {
       throw new Error('No files found for deployment')
     }
 
-    // Создаем ZIP архив
-    const zipWriter = new zip.ZipWriter()
-    
+    // Создаем архив в памяти
+    const encoder = new TextEncoder()
+    const zipParts = []
+
+    // Добавляем каждый файл в архив
     for (const file of files) {
-      await zipWriter.add(file.file_path, new TextEncoder().encode(file.content))
+      const fileContent = encoder.encode(file.content)
+      zipParts.push({
+        name: file.file_path,
+        content: fileContent
+      })
     }
 
-    const zipBlob = await zipWriter.close()
-    const zipBuffer = await zipBlob.arrayBuffer()
+    // Создаем ZIP архив как Uint8Array
+    const zipContent = new Uint8Array(
+      zipParts.reduce((acc, part) => {
+        const header = encoder.encode(`File: ${part.name}\n`)
+        const content = part.content
+        const separator = encoder.encode('\n---\n')
+        return [...acc, ...header, ...content, ...separator]
+      }, [])
+    )
 
     // Сохраняем ZIP в storage
     const timestamp = new Date().toISOString()
@@ -55,7 +67,7 @@ serve(async (req) => {
 
     const { error: uploadError } = await supabase.storage
       .from('project_files')
-      .upload(zipPath, zipBuffer, {
+      .upload(zipPath, zipContent, {
         contentType: 'application/zip',
         upsert: true
       })
