@@ -3,26 +3,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { ContainerStatus } from "../ContainerStatus";
 import { useToast } from "@/hooks/use-toast";
 import { DeploymentUrl } from "./deployment/DeploymentUrl";
-import { DeploymentStatus, type DeploymentStatus as TDeploymentStatus } from "./deployment/DeploymentStatus";
+import { DeploymentStatus } from "./deployment/DeploymentStatus";
 
 interface PreviewDeploymentProps {
   onError: (error: string | null) => void;
 }
 
-const progressMap: Record<TDeploymentStatus, number> = {
-  pending: 0,
-  preparing: 20,
-  packaging: 40,
-  building: 60,
-  deploying: 80,
-  deployed: 100,
-  error: 0,
-};
-
 export const PreviewDeployment = ({ onError }: PreviewDeploymentProps) => {
   const [deploymentUrl, setDeploymentUrl] = useState<string | null>(null);
   const [containerId, setContainerId] = useState<string | null>(null);
-  const [deploymentStatus, setDeploymentStatus] = useState<TDeploymentStatus>('pending');
+  const [deploymentStatus, setDeploymentStatus] = useState<'pending' | 'preparing' | 'packaging' | 'building' | 'deploying' | 'deployed' | 'error'>('pending');
   const [progress, setProgress] = useState(0);
   const { toast } = useToast();
 
@@ -30,58 +20,69 @@ export const PreviewDeployment = ({ onError }: PreviewDeploymentProps) => {
     fetchLatestDeployment();
     const unsubscribe = subscribeToDeploymentUpdates();
     return () => {
-      unsubscribe();
+      if (typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
     };
   }, []);
 
-  const subscribeToDeploymentUpdates = () => {
-    const handleDeploymentUpdate = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+  const subscribeToDeploymentUpdates = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return () => {};
 
-      const channel = supabase
-        .channel('deployment-updates')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'deployed_projects',
-            filter: `user_id=eq.${session.user.id}`
-          },
-          (payload) => {
-            if (payload.new) {
-              const { status, project_url } = payload.new as any;
-              setDeploymentStatus(status as TDeploymentStatus);
-              setProgress(progressMap[status as TDeploymentStatus]);
-              
-              if (project_url) {
-                setDeploymentUrl(project_url);
-              }
+    const channel = supabase
+      .channel('deployment-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'deployed_projects',
+          filter: `user_id=eq.${session.user.id}`
+        },
+        (payload) => {
+          if (payload.new) {
+            const { status, project_url } = payload.new as any;
+            setDeploymentStatus(status as any);
+            setProgress(getProgressForStatus(status));
+            
+            if (project_url) {
+              setDeploymentUrl(project_url);
+            }
 
-              if (status === 'deployed') {
-                toast({
-                  title: "Развертывание завершено",
-                  description: "Ваш проект успешно развернут",
-                });
-              } else if (status === 'error') {
-                toast({
-                  variant: "destructive",
-                  title: "Ошибка развертывания",
-                  description: "Произошла ошибка при развертывании проекта",
-                });
-              }
+            if (status === 'deployed') {
+              toast({
+                title: "Развертывание завершено",
+                description: "Ваш проект успешно развернут",
+              });
+            } else if (status === 'error') {
+              toast({
+                variant: "destructive",
+                title: "Ошибка развертывания",
+                description: "Произошла ошибка при развертывании проекта",
+              });
             }
           }
-        )
-        .subscribe();
+        }
+      )
+      .subscribe();
 
-      return () => {
-        supabase.removeChannel(channel);
-      };
+    return () => {
+      supabase.removeChannel(channel);
     };
+  };
 
-    return handleDeploymentUpdate();
+  const getProgressForStatus = (status: string): number => {
+    const progressMap: Record<string, number> = {
+      pending: 0,
+      preparing: 20,
+      packaging: 40,
+      building: 60,
+      deploying: 80,
+      deployed: 100,
+      error: 0,
+    };
+    return progressMap[status] || 0;
   };
 
   const fetchLatestDeployment = async () => {
@@ -105,8 +106,8 @@ export const PreviewDeployment = ({ onError }: PreviewDeploymentProps) => {
 
       if (deployment) {
         setDeploymentUrl(deployment.project_url);
-        setDeploymentStatus(deployment.status as TDeploymentStatus);
-        setProgress(progressMap[deployment.status as TDeploymentStatus]);
+        setDeploymentStatus(deployment.status as any);
+        setProgress(getProgressForStatus(deployment.status));
         
         const { data: container, error: containerError } = await supabase
           .from('docker_containers')
