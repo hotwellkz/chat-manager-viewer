@@ -26,19 +26,25 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Получаем информацию о контейнере пользователя
+    // Получаем информацию о контейнере и метрики
     const { data: containers, error: containerError } = await supabase
       .from('docker_containers')
-      .select('*')
+      .select(`
+        *,
+        container_metrics(
+          cpu_usage,
+          memory_usage,
+          error_count
+        )
+      `)
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
       .limit(1)
+      .single()
 
     if (containerError) {
       console.error('Error fetching container info:', containerError)
     }
-
-    const containerInfo = containers?.[0]
 
     // Получаем GitHub токен пользователя
     const { data: integration, error: integrationError } = await supabase
@@ -58,7 +64,6 @@ serve(async (req) => {
     const [owner, repo] = integration.repository_name.split('/')
     
     try {
-      // Создаем новую ветку для изменений
       const timestamp = new Date().getTime()
       const branchName = `update-${timestamp}`
       
@@ -76,21 +81,46 @@ serve(async (req) => {
         sha: ref.object.sha,
       })
 
-      // Формируем расширенное сообщение коммита
+      // Формируем расширенное сообщение коммита с метаданными
+      const containerInfo = containers ? {
+        id: containers.container_id,
+        status: containers.status,
+        url: containers.container_url,
+        framework: containers.framework,
+        port: containers.port,
+        metrics: containers.container_metrics?.[0] ? {
+          cpu: `${Math.round(containers.container_metrics[0].cpu_usage * 100)}%`,
+          memory: `${Math.round(containers.container_metrics[0].memory_usage / 1024 / 1024)}MB`,
+          errors: containers.container_metrics[0].error_count
+        } : null,
+        created: containers.created_at,
+        lastUpdated: containers.updated_at
+      } : null;
+
       const extendedMessage = `${commitMessage || 'Update from Lovable'}
 
-Container Info:
+Container Information:
 ${containerInfo ? `
-- Status: ${containerInfo.status}
-- URL: ${containerInfo.container_url}
-- Framework: ${containerInfo.framework}
-- Port: ${containerInfo.port}
-` : 'No container info available'}
+🔧 Container ID: ${containerInfo.id}
+📊 Status: ${containerInfo.status}
+🌐 URL: ${containerInfo.url || 'N/A'}
+⚙️ Framework: ${containerInfo.framework}
+🔌 Port: ${containerInfo.port}
 
-Files changed:
+Performance Metrics:
+${containerInfo.metrics ? `
+CPU Usage: ${containerInfo.metrics.cpu}
+Memory Usage: ${containerInfo.metrics.memory}
+Error Count: ${containerInfo.metrics.errors}` : 'No metrics available'}
+
+📅 Created: ${containerInfo.created}
+🔄 Last Updated: ${containerInfo.lastUpdated}
+` : 'No container information available'}
+
+Files Changed:
 ${files.map(f => `- ${f.path}`).join('\n')}
 
-Timestamp: ${new Date().toISOString()}
+🕒 Timestamp: ${new Date().toISOString()}
 `
 
       // Создаем коммит с изменениями
