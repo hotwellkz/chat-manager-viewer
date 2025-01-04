@@ -35,7 +35,24 @@ export const handlePrompt = async (req, res) => {
     }
 
     // Формируем системный промт в зависимости от фреймворка
-    let systemPrompt = "You are a helpful assistant that generates structured responses for code generation. ";
+    let systemPrompt = `You are a helpful assistant that generates structured responses for code generation. 
+    Your response must always be in the following JSON format:
+    {
+      "files": [
+        {
+          "path": "relative/path/to/file.ext",
+          "content": "file content here",
+          "type": "create|update|delete"
+        }
+      ],
+      "description": "Detailed explanation of changes",
+      "dependencies": ["package1", "package2"],
+      "containerConfig": {
+        "port": number,
+        "env": ["KEY=value"]
+      }
+    }`;
+
     switch (framework) {
       case 'react':
         systemPrompt += "You specialize in creating React applications with TypeScript, React Router, and Tailwind CSS. ";
@@ -47,16 +64,17 @@ export const handlePrompt = async (req, res) => {
         systemPrompt += "You specialize in creating Vue.js applications with TypeScript, Vue Router, and Vuex. ";
         break;
     }
-    systemPrompt += "Always return response in JSON format with fields: files (array of file objects with path and content), description (string with explanation).";
 
     console.log('Отправляем запрос к OpenAI...');
     // Получаем ответ от OpenAI
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: 'gpt-4-turbo-preview',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: prompt },
       ],
+      temperature: 0.7,
+      max_tokens: 4000,
     });
 
     if (!completion.choices || !completion.choices[0] || !completion.choices[0].message) {
@@ -64,41 +82,68 @@ export const handlePrompt = async (req, res) => {
       throw new Error('Некорректный ответ от OpenAI API');
     }
 
-    const response = JSON.parse(completion.choices[0].message.content);
-    console.log('Получен ответ от OpenAI:', response);
+    let response;
+    try {
+      response = JSON.parse(completion.choices[0].message.content);
+      console.log('Получен ответ от OpenAI:', response);
+    } catch (error) {
+      console.error('Ошибка парсинга JSON ответа:', error);
+      throw new Error('Некорректный формат ответа от OpenAI');
+    }
+
+    // Валидация структуры ответа
+    if (!response.files || !Array.isArray(response.files) || !response.description) {
+      throw new Error('Некорректная структура ответа от OpenAI');
+    }
 
     // Сохраняем файлы
-    if (response.files && response.files.length > 0) {
+    if (response.files.length > 0) {
       console.log('Сохраняем файлы...');
       for (const file of response.files) {
-        const filePath = `${userId}/${file.path}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('project_files')
-          .upload(filePath, file.content, {
-            contentType: 'text/plain',
-            upsert: true,
-          });
-
-        if (uploadError) {
-          console.error('Ошибка при загрузке файла в Storage:', uploadError);
-          throw uploadError;
+        if (!file.path || !file.content) {
+          console.error('Некорректная структура файла:', file);
+          continue;
         }
 
-        const { error: fileError } = await supabase
-          .from('files')
-          .insert({
-            user_id: userId,
-            filename: path.basename(file.path),
-            file_path: filePath,
-            content_type: 'text/plain',
-            size: Buffer.byteLength(file.content, 'utf8'),
-            content: file.content,
-          });
+        const filePath = `${userId}/${file.path}`;
 
-        if (fileError) {
-          console.error('Ошибка при сохранении метаданных файла:', fileError);
-          throw fileError;
+        if (file.type === 'delete') {
+          const { error: deleteError } = await supabase.storage
+            .from('project_files')
+            .remove([filePath]);
+
+          if (deleteError) {
+            console.error('Ошибка при удалении файла:', deleteError);
+            continue;
+          }
+        } else {
+          const { error: uploadError } = await supabase.storage
+            .from('project_files')
+            .upload(filePath, file.content, {
+              contentType: 'text/plain',
+              upsert: true,
+            });
+
+          if (uploadError) {
+            console.error('Ошибка при загрузке файла в Storage:', uploadError);
+            continue;
+          }
+
+          const { error: fileError } = await supabase
+            .from('files')
+            .insert({
+              user_id: userId,
+              filename: path.basename(file.path),
+              file_path: filePath,
+              content_type: 'text/plain',
+              size: Buffer.byteLength(file.content, 'utf8'),
+              content: file.content,
+            });
+
+          if (fileError) {
+            console.error('Ошибка при сохранении метаданных файла:', fileError);
+            continue;
+          }
         }
       }
     }
@@ -119,7 +164,10 @@ export const handlePrompt = async (req, res) => {
     }
 
     console.log('Успешно обработан запрос');
-    res.json(response);
+    res.json({
+      ...response,
+      success: true,
+    });
   } catch (error) {
     console.error('Error:', error);
     res.status(500).json({
