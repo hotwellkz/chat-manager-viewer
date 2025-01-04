@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { PreviewFiles } from "./preview/PreviewFiles";
 import { PreviewDeployment } from "./preview/PreviewDeployment";
+import { FileChangeTracker } from "./FileChangeTracker";
 
 export const Preview = () => {
   const [showCode, setShowCode] = useState(false);
@@ -91,6 +92,7 @@ export const Preview = () => {
           />
         )}
       </div>
+      <FileChangeTracker />
     </div>
   );
 };
