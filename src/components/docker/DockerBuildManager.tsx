@@ -3,19 +3,14 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { BuildControls } from "./BuildControls";
-import { BuildStatus } from "./BuildStatus";
 import { DeploymentLink } from "./DeploymentLink";
+import { DeploymentProgress } from "./DeploymentProgress";
+import { DeploymentSteps } from "./DeploymentSteps";
 
 interface BuildMetadata {
   version: string;
   containerId: string;
   lastModified: string;
-}
-
-interface BuildStatus {
-  stage: 'idle' | 'preparing' | 'packaging' | 'building' | 'deploying' | 'completed' | 'error';
-  message: string;
-  progress: number;
 }
 
 const STAGES = {
@@ -28,30 +23,35 @@ const STAGES = {
   error: { progress: 0, message: 'Произошла ошибка при сборке' }
 };
 
+type BuildStage = keyof typeof STAGES;
+
 export const DockerBuildManager = () => {
   const [isBuilding, setIsBuilding] = useState(false);
-  const [buildStatus, setBuildStatus] = useState<BuildStatus>({ 
-    stage: 'idle', 
-    message: STAGES.idle.message,
-    progress: STAGES.idle.progress 
-  });
+  const [buildStage, setBuildStage] = useState<BuildStage>('idle');
   const [metadata, setMetadata] = useState<BuildMetadata | null>(null);
   const [deployedUrl, setDeployedUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const updateBuildStatus = (stage: BuildStatus['stage']) => {
-    const stageInfo = STAGES[stage];
-    setBuildStatus({
-      stage,
-      message: stageInfo.message,
-      progress: stageInfo.progress
-    });
+  const getDeploymentSteps = () => {
+    const stages: BuildStage[] = ['preparing', 'packaging', 'building', 'deploying'];
+    return stages.map(stage => ({
+      label: STAGES[stage].message,
+      status: buildStage === stage 
+        ? 'in-progress'
+        : stages.indexOf(stage) < stages.indexOf(buildStage as BuildStage)
+          ? 'completed'
+          : buildStage === 'error'
+            ? 'error'
+            : 'pending'
+    }));
   };
 
   const handleBuild = async () => {
     try {
       setIsBuilding(true);
-      updateBuildStatus('preparing');
+      setError(null);
+      setBuildStage('preparing');
       
       const { data: { user } } = await supabase.auth.getUser();
       
@@ -59,7 +59,7 @@ export const DockerBuildManager = () => {
         throw new Error('Пользователь не авторизован');
       }
 
-      updateBuildStatus('packaging');
+      setBuildStage('packaging');
       const response = await supabase.functions.invoke('prepare-deployment', {
         body: { userId: user.id }
       });
@@ -69,7 +69,7 @@ export const DockerBuildManager = () => {
       }
 
       setMetadata(response.data.metadata);
-      updateBuildStatus('building');
+      setBuildStage('building');
       
       toast({
         title: "Сборка запущена",
@@ -93,17 +93,17 @@ export const DockerBuildManager = () => {
 
         switch (deployData.status) {
           case 'packaging':
-            updateBuildStatus('packaging');
+            setBuildStage('packaging');
             break;
           case 'building':
-            updateBuildStatus('building');
+            setBuildStage('building');
             break;
           case 'deploying':
-            updateBuildStatus('deploying');
+            setBuildStage('deploying');
             break;
           case 'deployed':
             clearInterval(checkBuildStatus);
-            updateBuildStatus('completed');
+            setBuildStage('completed');
             setDeployedUrl(deployData.project_url);
             setIsBuilding(false);
             toast({
@@ -119,7 +119,8 @@ export const DockerBuildManager = () => {
 
     } catch (error) {
       console.error('Build error:', error);
-      updateBuildStatus('error');
+      setBuildStage('error');
+      setError(error.message);
       setIsBuilding(false);
       toast({
         variant: "destructive",
@@ -130,7 +131,7 @@ export const DockerBuildManager = () => {
   };
 
   return (
-    <Card className="p-4 space-y-4">
+    <Card className="p-4 space-y-6">
       <div className="flex items-center justify-between">
         <BuildControls 
           isBuilding={isBuilding}
@@ -140,12 +141,16 @@ export const DockerBuildManager = () => {
         <DeploymentLink url={deployedUrl} />
       </div>
       
-      <BuildStatus 
-        stage={buildStatus.stage}
-        message={buildStatus.message}
-        progress={buildStatus.progress}
-        isBuilding={isBuilding}
+      <DeploymentProgress 
+        stage={buildStage}
+        message={STAGES[buildStage].message}
+        progress={STAGES[buildStage].progress}
+        error={error}
       />
+
+      {isBuilding && (
+        <DeploymentSteps steps={getDeploymentSteps()} />
+      )}
     </Card>
   );
 };
