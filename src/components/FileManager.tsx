@@ -1,19 +1,8 @@
 import { useState, useEffect } from "react";
-import { Button } from "./ui/button";
-import { ScrollArea } from "./ui/scroll-area";
 import { useToast } from "./ui/use-toast";
-import {
-  ChevronRight,
-  ChevronDown,
-  File,
-  Folder,
-  Download,
-  Edit,
-  Trash,
-  Plus,
-} from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { FilePackager } from "./FilePackager";
+import { FileToolbar } from "./file/FileToolbar";
+import { FileTree } from "./file/FileTree";
 
 interface FileNode {
   id: string;
@@ -44,7 +33,6 @@ export const FileManager = () => {
 
       if (error) throw error;
 
-      // Преобразуем плоский список файлов в древовидную структуру
       const fileTree = buildFileTree(data || []);
       setFiles(fileTree);
     } catch (error) {
@@ -101,7 +89,6 @@ export const FileManager = () => {
 
       if (error) throw error;
 
-      // Создаем ссылку для скачивания
       const url = window.URL.createObjectURL(data);
       const a = document.createElement('a');
       a.href = url;
@@ -127,14 +114,12 @@ export const FileManager = () => {
 
   const handleDelete = async (id: string, path: string) => {
     try {
-      // Удаляем файл из storage
       const { error: storageError } = await supabase.storage
         .from('project_files')
         .remove([path]);
 
       if (storageError) throw storageError;
 
-      // Удаляем запись из базы данных
       const { error: dbError } = await supabase
         .from('files')
         .delete()
@@ -147,7 +132,6 @@ export const FileManager = () => {
         description: "Файл успешно удален",
       });
 
-      // Обновляем список файлов
       await fetchFiles();
     } catch (error) {
       console.error('Error deleting file:', error);
@@ -163,78 +147,16 @@ export const FileManager = () => {
     setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const renderNode = (node: FileNode, level = 0) => {
-    const isExpanded = expanded[node.id];
-    const paddingLeft = level * 16;
-
-    return (
-      <div key={node.id}>
-        <div
-          className="flex items-center hover:bg-accent/50 py-1 px-2"
-          style={{ paddingLeft: `${paddingLeft}px` }}
-        >
-          {node.type === "folder" ? (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-4 w-4"
-              onClick={() => toggleFolder(node.id)}
-            >
-              {isExpanded ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronRight className="h-4 w-4" />
-              )}
-            </Button>
-          ) : (
-            <span className="w-4" />
-          )}
-          {node.type === "folder" ? (
-            <Folder className="h-4 w-4 mr-2" />
-          ) : (
-            <File className="h-4 w-4 mr-2" />
-          )}
-          <span className="flex-1">{node.name}</span>
-          {node.type === "file" && node.path && (
-            <div className="flex gap-1">
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-6 w-6"
-                onClick={() => handleDownload(node.path!)}
-              >
-                <Download className="h-3 w-3" />
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-6 w-6"
-                onClick={() => handleDelete(node.id, node.path!)}
-              >
-                <Trash className="h-3 w-3" />
-              </Button>
-            </div>
-          )}
-        </div>
-        {node.type === "folder" && isExpanded && node.children?.map((child) => renderNode(child, level + 1))}
-      </div>
-    );
-  };
-
   return (
     <div className="h-full flex flex-col border-l border-border">
-      <div className="p-2 border-b border-border flex justify-between items-center">
-        <h2 className="font-semibold">Файлы</h2>
-        <div className="flex gap-2">
-          <FilePackager />
-          <Button size="icon" variant="ghost">
-            <Plus className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-      <ScrollArea className="flex-1">
-        {files.map((node) => renderNode(node))}
-      </ScrollArea>
+      <FileToolbar />
+      <FileTree
+        files={files}
+        expanded={expanded}
+        onToggle={toggleFolder}
+        onDownload={handleDownload}
+        onDelete={handleDelete}
+      />
     </div>
   );
 };
