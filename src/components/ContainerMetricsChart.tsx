@@ -37,7 +37,15 @@ export const ContainerMetricsChart = ({ containerId }: MetricsChartProps) => {
         .limit(20);
 
       if (error) throw error;
-      return data as MetricDataPoint[];
+      
+      // Преобразуем данные в нужный формат
+      return (data || []).map(metric => ({
+        timestamp: metric.created_at,
+        cpu_usage: metric.cpu_usage,
+        memory_usage: metric.memory_usage,
+        memory_limit: metric.memory_limit,
+        error_count: metric.error_count
+      })) as MetricDataPoint[];
     },
     refetchInterval: 5000,
   });
@@ -75,7 +83,7 @@ export const ContainerMetricsChart = ({ containerId }: MetricsChartProps) => {
             >
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis 
-                dataKey="created_at" 
+                dataKey="timestamp" 
                 tickFormatter={(value) => new Date(value).toLocaleTimeString()}
               />
               <YAxis yAxisId="left" />
