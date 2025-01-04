@@ -11,6 +11,8 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Editor } from "@monaco-editor/react";
 import { ContainerStatus } from "./ContainerStatus";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 export const Preview = () => {
   const [showCode, setShowCode] = useState(false);
@@ -19,17 +21,32 @@ export const Preview = () => {
   const [deploymentUrl, setDeploymentUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [containerId, setContainerId] = useState<string | null>(null);
+  const navigate = useNavigate();
   
   useEffect(() => {
+    checkAuth();
     fetchFiles();
     fetchLatestDeployment();
   }, []);
 
+  const checkAuth = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      toast.error('Необходима авторизация');
+      navigate('/login');
+      return;
+    }
+  };
+
   const fetchFiles = async () => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
       const { data, error } = await supabase
         .from('files')
         .select('*')
+        .eq('user_id', session.user.id)
         .order('created_at', { ascending: false });
       
       if (error) {
@@ -50,9 +67,13 @@ export const Preview = () => {
 
   const fetchLatestDeployment = async () => {
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
       const { data: deployment, error } = await supabase
         .from('deployed_projects')
         .select('*')
+        .eq('user_id', session.user.id)
         .order('last_deployment', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -66,11 +87,11 @@ export const Preview = () => {
       if (deployment) {
         setDeploymentUrl(deployment.project_url);
         
-        // Получаем связанный контейнер
         const { data: container, error: containerError } = await supabase
           .from('docker_containers')
           .select('*')
           .eq('project_id', deployment.id)
+          .eq('user_id', session.user.id)
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
