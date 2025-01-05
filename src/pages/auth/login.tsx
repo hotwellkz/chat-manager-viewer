@@ -1,21 +1,63 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const LoginPage = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (session) {
+    const checkSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error("Ошибка при проверке сессии:", error);
+          toast({
+            title: "Ошибка",
+            description: "Произошла ошибка при проверке сессии",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        if (session) {
+          navigate("/");
+        }
+      } catch (error) {
+        console.error("Ошибка:", error);
+        toast({
+          title: "Ошибка",
+          description: "Произошла ошибка при проверке авторизации",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkSession();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session) {
         navigate("/");
       }
     });
 
     return () => subscription.unsubscribe();
-  }, [navigate]);
+  }, [navigate, toast]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#1A1F2C] to-[#6E59A5] flex items-center justify-center">
+        <div className="text-white">Загрузка...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#1A1F2C] to-[#6E59A5] flex items-center justify-center p-4">
