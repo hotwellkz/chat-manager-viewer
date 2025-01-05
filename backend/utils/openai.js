@@ -23,7 +23,11 @@ const getOpenAIKey = async () => {
 
     return data.value;
   } catch (error) {
-    console.error('Ошибка при получении API ключа:', error);
+    console.error('Критическая ошибка при получении API ключа:', {
+      error: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    });
     throw error;
   }
 };
@@ -33,12 +37,22 @@ let openai = null;
 export const initOpenAI = async () => {
   try {
     if (!openai) {
+      console.log('Инициализация клиента OpenAI...');
       const apiKey = await getOpenAIKey();
-      openai = new OpenAI({ apiKey });
+      openai = new OpenAI({ 
+        apiKey,
+        timeout: 30000, // 30 секунд таймаут для всех запросов
+        maxRetries: 2 // Максимальное количество повторных попыток
+      });
+      console.log('Клиент OpenAI успешно инициализирован');
     }
     return openai;
   } catch (error) {
-    console.error('Ошибка при инициализации OpenAI:', error);
+    console.error('Критическая ошибка при инициализации OpenAI:', {
+      error: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    });
     throw error;
   }
 };
