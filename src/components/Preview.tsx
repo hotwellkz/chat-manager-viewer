@@ -17,10 +17,25 @@ import { FileChangeTracker } from "./FileChangeTracker";
 export const Preview = () => {
   const [showCode, setShowCode] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
+  const [selectedFileContent, setSelectedFileContent] = useState<string | null>(null);
   const navigate = useNavigate();
   
   useEffect(() => {
     checkAuth();
+    
+    // Добавляем слушатель события для отображения содержимого файла
+    const handleShowFileContent = (event: CustomEvent<{ content: string, path: string }>) => {
+      setSelectedFileContent(event.detail.content);
+      setSelectedFilePath(event.detail.path);
+      setShowCode(true);
+    };
+
+    window.addEventListener('showFileContent', handleShowFileContent as EventListener);
+
+    return () => {
+      window.removeEventListener('showFileContent', handleShowFileContent as EventListener);
+    };
   }, []);
 
   const checkAuth = async () => {
@@ -83,7 +98,11 @@ export const Preview = () => {
         </div>
       </div>
       <div className="flex-1 bg-background">
-        <PreviewFiles showCode={showCode} />
+        <PreviewFiles 
+          showCode={showCode} 
+          selectedFilePath={selectedFilePath}
+          selectedFileContent={selectedFileContent}
+        />
         {!showCode && (
           <iframe 
             src={error ? 'about:blank' : undefined}

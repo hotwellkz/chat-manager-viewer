@@ -6,15 +6,22 @@ import { FileVersion } from "@/integrations/supabase/types/tables";
 
 interface PreviewFilesProps {
   showCode: boolean;
+  selectedFilePath?: string | null;
+  selectedFileContent?: string | null;
 }
 
-export const PreviewFiles = ({ showCode }: PreviewFilesProps) => {
+export const PreviewFiles = ({ 
+  showCode, 
+  selectedFilePath, 
+  selectedFileContent 
+}: PreviewFilesProps) => {
   const [files, setFiles] = useState<FilesTable['Row'][]>([]);
-  const [selectedFile, setSelectedFile] = useState<FilesTable['Row'] | null>(null);
 
   useEffect(() => {
-    fetchFiles();
-  }, []);
+    if (showCode) {
+      fetchFiles();
+    }
+  }, [showCode]);
 
   const fetchFiles = async () => {
     try {
@@ -38,9 +45,6 @@ export const PreviewFiles = ({ showCode }: PreviewFilesProps) => {
           previous_versions: (file.previous_versions as unknown as FileVersion[]) || []
         }));
         setFiles(typedData);
-        if (typedData.length > 0) {
-          setSelectedFile(typedData[0]);
-        }
       }
     } catch (err) {
       console.error('Error in fetchFiles:', err);
@@ -49,13 +53,21 @@ export const PreviewFiles = ({ showCode }: PreviewFilesProps) => {
 
   if (!showCode) return null;
 
+  const getFileLanguage = (filePath: string | null) => {
+    if (!filePath) return 'typescript';
+    if (filePath.endsWith('.css')) return 'css';
+    if (filePath.endsWith('.html')) return 'html';
+    if (filePath.endsWith('.json')) return 'json';
+    return 'typescript';
+  };
+
   return (
     <div className="h-full">
-      {selectedFile ? (
+      {selectedFileContent ? (
         <Editor
           height="100%"
-          defaultLanguage="typescript"
-          value={selectedFile.content || '// Нет содержимого'}
+          defaultLanguage={getFileLanguage(selectedFilePath)}
+          value={selectedFileContent}
           options={{
             readOnly: true,
             minimap: { enabled: false },

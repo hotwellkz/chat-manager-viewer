@@ -1,5 +1,7 @@
 import { ChevronRight, ChevronDown, File, Folder, Download, Trash } from "lucide-react";
 import { Button } from "../ui/button";
+import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 interface FileNodeProps {
   node: {
@@ -27,18 +29,50 @@ export const FileNode = ({
   const isExpanded = expanded[node.id];
   const paddingLeft = level * 16;
 
+  const handleFileClick = async () => {
+    if (node.type === 'file' && node.path) {
+      try {
+        const { data: fileData, error } = await supabase
+          .from('files')
+          .select('content')
+          .eq('file_path', node.path)
+          .single();
+
+        if (error) {
+          console.error('Error fetching file content:', error);
+          return;
+        }
+
+        // Отправляем событие для обновления кода в Preview
+        const event = new CustomEvent('showFileContent', { 
+          detail: { 
+            content: fileData.content,
+            path: node.path 
+          } 
+        });
+        window.dispatchEvent(event);
+      } catch (err) {
+        console.error('Error in handleFileClick:', err);
+      }
+    }
+  };
+
   return (
     <div key={node.id}>
       <div
-        className="flex items-center hover:bg-accent/50 py-1 px-2"
+        className={`flex items-center hover:bg-accent/50 py-1 px-2 ${node.type === 'file' ? 'cursor-pointer' : ''}`}
         style={{ paddingLeft: `${paddingLeft}px` }}
+        onClick={node.type === 'file' ? handleFileClick : undefined}
       >
         {node.type === "folder" ? (
           <Button
             variant="ghost"
             size="icon"
             className="h-4 w-4"
-            onClick={() => onToggle(node.id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggle(node.id);
+            }}
           >
             {isExpanded ? (
               <ChevronDown className="h-4 w-4" />
@@ -61,7 +95,10 @@ export const FileNode = ({
               variant="ghost" 
               size="icon" 
               className="h-6 w-6"
-              onClick={() => onDownload(node.path!)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDownload(node.path!);
+              }}
             >
               <Download className="h-3 w-3" />
             </Button>
@@ -69,7 +106,10 @@ export const FileNode = ({
               variant="ghost" 
               size="icon" 
               className="h-6 w-6"
-              onClick={() => onDelete(node.id, node.path!)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(node.id, node.path!);
+              }}
             >
               <Trash className="h-3 w-3" />
             </Button>
