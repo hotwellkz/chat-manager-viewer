@@ -24,7 +24,6 @@ export const Preview = () => {
   useEffect(() => {
     checkAuth();
     
-    // Добавляем слушатель события для отображения содержимого файла
     const handleShowFileContent = (event: CustomEvent<{ content: string, path: string }>) => {
       setSelectedFileContent(event.detail.content);
       setSelectedFilePath(event.detail.path);
@@ -73,8 +72,8 @@ export const Preview = () => {
   };
 
   return (
-    <div className="h-full flex flex-col border-l border-border">
-      <div className="p-2 border-b border-border flex justify-between items-center">
+    <div className="h-full flex flex-col">
+      <div className="p-2 border-b border-border flex justify-between items-center bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="flex flex-col gap-2">
           {error ? (
             <span className="text-sm text-red-500">{error}</span>
@@ -97,7 +96,7 @@ export const Preview = () => {
           </Button>
         </div>
       </div>
-      <div className="flex-1 bg-background">
+      <div className="flex-1 overflow-hidden">
         <PreviewFiles 
           showCode={showCode} 
           selectedFilePath={selectedFilePath}
