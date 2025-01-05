@@ -100,7 +100,7 @@ export const PreviewDeployment = ({ onError }: PreviewDeploymentProps) => {
         .from('deployed_projects')
         .select('*')
         .eq('user_id', session.user.id)
-        .order('last_deployment', { ascending: false })
+        .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
@@ -115,6 +115,7 @@ export const PreviewDeployment = ({ onError }: PreviewDeploymentProps) => {
         setDeploymentStatus(deployment.status as any);
         setProgress(getProgressForStatus(deployment.status));
         
+        // Получаем информацию о контейнере только если есть развертывание
         const { data: container, error: containerError } = await supabase
           .from('docker_containers')
           .select('*')
@@ -132,6 +133,12 @@ export const PreviewDeployment = ({ onError }: PreviewDeploymentProps) => {
         if (container) {
           setContainerId(container.id);
         }
+      } else {
+        // Если развертываний нет, устанавливаем начальное состояние
+        setDeploymentStatus('pending');
+        setProgress(0);
+        setDeploymentUrl(null);
+        setContainerId(null);
       }
     } catch (err) {
       console.error('Error in fetchLatestDeployment:', err);
