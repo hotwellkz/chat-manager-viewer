@@ -26,65 +26,83 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Получаем все файлы пользователя с подробным логированием
-    console.log('Fetching files for user:', userId)
-    const { data: files, error: filesError } = await supabase
+    // Получаем все файлы пользователя из базы данных
+    console.log('Fetching files from database for user:', userId)
+    const { data: dbFiles, error: dbError } = await supabase
       .from('files')
       .select('*')
       .eq('user_id', userId)
 
-    if (filesError) {
-      console.error('Error fetching files:', filesError)
-      throw filesError
+    if (dbError) {
+      console.error('Error fetching files from database:', dbError)
+      throw dbError
     }
 
-    console.log('Found files:', files?.length || 0)
+    console.log('Found files in database:', dbFiles?.length || 0)
 
-    if (!files || files.length === 0) {
-      // Проверяем наличие файлов в storage
-      console.log('Checking storage for files...')
-      const { data: storageFiles, error: storageError } = await supabase.storage
-        .from('project_files')
-        .list(`${userId}/`)
+    // Проверяем storage, даже если файлы найдены в БД
+    console.log('Checking storage for files...')
+    const { data: storageFiles, error: storageError } = await supabase.storage
+      .from('project_files')
+      .list(`${userId}/`, {
+        limit: 100,
+        offset: 0,
+        sortBy: { column: 'name', order: 'asc' }
+      })
 
-      if (storageError) {
-        console.error('Error checking storage:', storageError)
-        throw storageError
-      }
+    if (storageError) {
+      console.error('Error checking storage:', storageError)
+      throw storageError
+    }
 
-      if (!storageFiles || storageFiles.length === 0) {
-        console.error('No files found in storage for user:', userId)
-        throw new Error('No files found for deployment')
-      }
+    console.log('Found files in storage:', storageFiles?.length || 0)
 
-      // Если файлы есть в storage, но нет в БД - создаем записи
-      console.log('Found files in storage, creating DB records...')
+    // Если нет файлов ни в БД, ни в storage
+    if ((!dbFiles || dbFiles.length === 0) && (!storageFiles || storageFiles.length === 0)) {
+      console.error('No files found in either database or storage for user:', userId)
+      throw new Error('No files found for deployment. Please create some files first.')
+    }
+
+    let files = dbFiles || []
+
+    // Если файлы есть только в storage, создаем записи в БД
+    if (files.length === 0 && storageFiles && storageFiles.length > 0) {
+      console.log('Creating DB records for storage files...')
+      
       for (const file of storageFiles) {
-        const { data: fileData, error: downloadError } = await supabase.storage
-          .from('project_files')
-          .download(`${userId}/${file.name}`)
+        if (!file.name) continue
 
-        if (downloadError) {
-          console.error('Error downloading file:', downloadError)
-          continue
-        }
+        try {
+          const { data: fileData, error: downloadError } = await supabase.storage
+            .from('project_files')
+            .download(`${userId}/${file.name}`)
 
-        const content = await fileData.text()
+          if (downloadError) {
+            console.error('Error downloading file:', file.name, downloadError)
+            continue
+          }
 
-        const { error: insertError } = await supabase
-          .from('files')
-          .insert({
-            user_id: userId,
-            filename: file.name,
-            file_path: `${userId}/${file.name}`,
-            content: content,
-            content_type: 'text/plain',
-            size: file.metadata?.size || 0,
-            version: 1
-          })
+          const content = await fileData.text()
 
-        if (insertError) {
-          console.error('Error inserting file record:', insertError)
+          const { error: insertError } = await supabase
+            .from('files')
+            .insert({
+              user_id: userId,
+              filename: file.name,
+              file_path: `${userId}/${file.name}`,
+              content: content,
+              content_type: file.metadata?.mimetype || 'text/plain',
+              size: file.metadata?.size || 0,
+              version: 1
+            })
+
+          if (insertError) {
+            console.error('Error inserting file record:', file.name, insertError)
+          } else {
+            console.log('Successfully created DB record for file:', file.name)
+          }
+        } catch (error) {
+          console.error('Error processing storage file:', file.name, error)
         }
       }
 
@@ -99,7 +117,7 @@ serve(async (req) => {
         throw updateError
       }
 
-      files = updatedFiles
+      files = updatedFiles || []
     }
 
     console.log('Processing files for deployment...')
@@ -115,7 +133,8 @@ serve(async (req) => {
       })),
       metadata: {
         version: "1.0.0",
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        fileCount: files.length
       }
     }
 
