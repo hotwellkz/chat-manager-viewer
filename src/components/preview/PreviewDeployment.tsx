@@ -105,7 +105,7 @@ export const PreviewDeployment = ({ onError }: PreviewDeploymentProps) => {
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false })
         .limit(1)
-        .maybeSingle(); // Используем maybeSingle вместо single
+        .maybeSingle(); // Изменили с .single() на .maybeSingle()
 
       if (error) {
         console.error('Error fetching deployment:', error);
