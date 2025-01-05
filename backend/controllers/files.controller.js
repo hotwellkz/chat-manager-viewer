@@ -1,10 +1,6 @@
-import { createClient } from '@supabase/supabase-js';
-import { saveFileToStorage, saveFileMetadata } from '../services/fileService.js';
-
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+import { saveToStorage } from '../services/storageService.js';
+import { saveFileMetadata } from '../services/fileMetadataService.js';
+import { supabase } from '../config/supabase.js';
 
 export const handleFiles = async (req, res) => {
   try {
@@ -29,7 +25,7 @@ export const handleFiles = async (req, res) => {
 
       try {
         // Сохраняем файл в Storage
-        const uploadData = await saveFileToStorage(userId, file);
+        const uploadData = await saveToStorage(userId, file);
         
         // Сохраняем метаданные
         const fileData = await saveFileMetadata(userId, file, uploadData);
