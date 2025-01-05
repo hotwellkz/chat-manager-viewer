@@ -31,7 +31,8 @@ export const handleDeployment = async (req, res) => {
         .update({
           framework: framework,
           status: 'preparing',
-          last_deployment: new Date().toISOString()
+          last_deployment: new Date().toISOString(),
+          container_logs: 'Инициализация процесса сборки...'
         })
         .eq('id', existingProjects[0].id)
         .select()
@@ -51,7 +52,8 @@ export const handleDeployment = async (req, res) => {
         .insert({
           user_id: userId,
           framework: framework,
-          status: 'preparing'
+          status: 'preparing',
+          container_logs: 'Создание нового проекта...'
         })
         .select()
         .single();
@@ -72,7 +74,8 @@ export const handleDeployment = async (req, res) => {
         .from('deployed_projects')
         .update({ 
           status: 'error',
-          last_deployment: new Date().toISOString()
+          last_deployment: new Date().toISOString(),
+          container_logs: 'Превышено время ожидания сборки (5 минут)'
         })
         .eq('id', deployment.id);
 
@@ -82,57 +85,47 @@ export const handleDeployment = async (req, res) => {
       });
     }, BUILD_TIMEOUT);
 
-    // Имитация процесса упаковки файлов с более частыми обновлениями
-    await supabase
-      .from('deployed_projects')
-      .update({ 
-        status: 'packaging',
-      })
-      .eq('id', deployment.id);
+    // Обновляем статус и логи для каждого этапа
+    const updateStatus = async (status, logs) => {
+      const { error } = await supabase
+        .from('deployed_projects')
+        .update({ 
+          status,
+          container_logs: logs,
+          last_deployment: new Date().toISOString()
+        })
+        .eq('id', deployment.id);
 
-    console.log('Packaging files...');
+      if (error) {
+        console.error(`Error updating status to ${status}:`, error);
+        throw error;
+      }
+      console.log(`Updated status to ${status} for deployment:`, deployment.id);
+    };
+
+    // Имитация процесса упаковки файлов с обновлением статуса
+    await updateStatus('packaging', 'Упаковка файлов проекта...');
     await new Promise(resolve => setTimeout(resolve, 2000));
 
     // Имитация процесса сборки с промежуточными обновлениями
-    await supabase
-      .from('deployed_projects')
-      .update({ 
-        status: 'building',
-      })
-      .eq('id', deployment.id);
-
-    console.log('Building project...');
+    await updateStatus('building', 'Начало сборки Docker образа...');
     
     // Добавляем промежуточные статусы сборки
     const buildSteps = [
-      'Инициализация сборки...',
-      'Установка зависимостей...',
-      'Компиляция проекта...',
+      'Инициализация сборки Docker образа...',
+      'Установка зависимостей проекта...',
+      'Компиляция исходного кода...',
       'Оптимизация сборки...',
-      'Подготовка Docker образа...'
+      'Создание Docker образа...'
     ];
 
     for (const step of buildSteps) {
-      await supabase
-        .from('deployed_projects')
-        .update({ 
-          status: 'building',
-          container_logs: step
-        })
-        .eq('id', deployment.id);
-      
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await updateStatus('building', step);
+      await new Promise(resolve => setTimeout(resolve, 3000));
     }
 
     // Имитация процесса развертывания
-    await supabase
-      .from('deployed_projects')
-      .update({ 
-        status: 'deploying',
-      })
-      .eq('id', deployment.id);
-
-    console.log('Deploying project...');
+    await updateStatus('deploying', 'Запуск Docker контейнера...');
     await new Promise(resolve => setTimeout(resolve, 2000));
 
     // Очищаем таймаут, так как процесс успешно завершен
@@ -142,7 +135,7 @@ export const handleDeployment = async (req, res) => {
     const deploymentUrl = `https://lovable${deployment.id.slice(0, 6)}.netlify.app`;
 
     // Обновляем статус и URL проекта
-    const { error: updateError } = await supabase
+    const { error: finalUpdateError } = await supabase
       .from('deployed_projects')
       .update({ 
         status: 'deployed',
@@ -152,9 +145,9 @@ export const handleDeployment = async (req, res) => {
       })
       .eq('id', deployment.id);
 
-    if (updateError) {
-      console.error('Error updating deployment status:', updateError);
-      throw updateError;
+    if (finalUpdateError) {
+      console.error('Error updating final deployment status:', finalUpdateError);
+      throw finalUpdateError;
     }
 
     console.log('Deployment completed successfully:', deploymentUrl);
