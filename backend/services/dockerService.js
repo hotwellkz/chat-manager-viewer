@@ -1,10 +1,5 @@
-import Docker from 'dockerode';
+import { docker } from '../config/docker.js';
 import { supabase } from '../config/supabase.js';
-
-const docker = new Docker({ 
-  host: process.env.DOCKER_HOST || 'http://localhost',
-  port: process.env.DOCKER_PORT || 2375
-});
 
 export const createAndStartContainer = async (userId, projectId, framework, files) => {
   try {
@@ -31,6 +26,10 @@ export const createAndStartContainer = async (userId, projectId, framework, file
       ]
     };
 
+    // Проверяем подключение к Docker
+    await docker.ping();
+    console.log('Docker connection verified');
+
     // Создаем контейнер
     console.log('Creating container with config:', containerConfig);
     const container = await docker.createContainer(containerConfig);
@@ -49,11 +48,16 @@ export const createAndStartContainer = async (userId, projectId, framework, file
     console.log('Starting container:', container.id);
     await container.start();
 
+    // Получаем информацию о контейнере
+    const containerInfo = await container.inspect();
+    const containerUrl = `http://${containerInfo.NetworkSettings.IPAddress}:3000`;
+
     // Обновляем статус после запуска
     await supabase
       .from('docker_containers')
       .update({ 
         status: 'running',
+        container_url: containerUrl,
         container_logs: 'Container started successfully'
       })
       .eq('project_id', projectId);
@@ -61,6 +65,7 @@ export const createAndStartContainer = async (userId, projectId, framework, file
     return {
       containerId: container.id,
       containerName,
+      containerUrl,
       status: 'running'
     };
 
@@ -105,7 +110,8 @@ export const getContainerLogs = async (containerId) => {
     const logs = await container.logs({
       stdout: true,
       stderr: true,
-      tail: 100
+      tail: 100,
+      follow: false
     });
     
     return logs.toString('utf8');
