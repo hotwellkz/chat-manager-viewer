@@ -94,7 +94,10 @@ export const PreviewDeployment = ({ onError }: PreviewDeploymentProps) => {
   const fetchLatestDeployment = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!session) {
+        console.log('No active session found');
+        return;
+      }
 
       const { data: deployment, error } = await supabase
         .from('deployed_projects')
@@ -102,7 +105,7 @@ export const PreviewDeployment = ({ onError }: PreviewDeploymentProps) => {
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false })
         .limit(1)
-        .maybeSingle();
+        .maybeSingle(); // Используем maybeSingle вместо single
 
       if (error) {
         console.error('Error fetching deployment:', error);
@@ -111,6 +114,7 @@ export const PreviewDeployment = ({ onError }: PreviewDeploymentProps) => {
       }
 
       if (deployment) {
+        console.log('Found deployment:', deployment);
         setDeploymentUrl(deployment.project_url);
         setDeploymentStatus(deployment.status as any);
         setProgress(getProgressForStatus(deployment.status));
@@ -123,7 +127,7 @@ export const PreviewDeployment = ({ onError }: PreviewDeploymentProps) => {
           .eq('user_id', session.user.id)
           .order('created_at', { ascending: false })
           .limit(1)
-          .maybeSingle();
+          .maybeSingle(); // Также используем maybeSingle здесь
 
         if (containerError) {
           console.error('Error fetching container:', containerError);
@@ -131,9 +135,13 @@ export const PreviewDeployment = ({ onError }: PreviewDeploymentProps) => {
         }
 
         if (container) {
+          console.log('Found container:', container);
           setContainerId(container.id);
+        } else {
+          console.log('No container found for deployment');
         }
       } else {
+        console.log('No deployments found');
         // Если развертываний нет, устанавливаем начальное состояние
         setDeploymentStatus('pending');
         setProgress(0);
