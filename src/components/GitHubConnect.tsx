@@ -29,6 +29,7 @@ export const GitHubConnect = () => {
       // Генерируем случайное состояние для безопасности
       const state = Math.random().toString(36).substring(7);
       
+ 
       // Сохраняем состояние в localStorage для сохранения между редиректами
       localStorage.setItem('github_oauth_state', state);
 
