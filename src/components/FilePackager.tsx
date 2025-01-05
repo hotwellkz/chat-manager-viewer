@@ -3,7 +3,12 @@ import { Archive } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "./ui/button";
-import { Tooltip } from "./ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "./ui/tooltip";
 
 export const FilePackager = () => {
   const [isPackaging, setIsPackaging] = useState(false);
@@ -53,16 +58,23 @@ export const FilePackager = () => {
   };
 
   return (
-    <Tooltip content="Упаковать в ZIP">
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={handlePackageFiles}
-        disabled={isPackaging}
-        className="h-8 w-8"
-      >
-        <Archive className="h-4 w-4" />
-      </Button>
-    </Tooltip>
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handlePackageFiles}
+            disabled={isPackaging}
+            className="h-8 w-8"
+          >
+            <Archive className="h-4 w-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Упаковать в ZIP</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 };

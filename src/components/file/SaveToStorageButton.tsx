@@ -1,7 +1,12 @@
 import { useState } from "react";
 import { Save } from "lucide-react";
 import { Button } from "../ui/button";
-import { Tooltip } from "../ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -60,16 +65,23 @@ export const SaveToStorageButton = () => {
   };
 
   return (
-    <Tooltip content="Сохранить в Storage">
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={handleSaveToStorage}
-        disabled={isSaving}
-        className="h-8 w-8"
-      >
-        <Save className="h-4 w-4" />
-      </Button>
-    </Tooltip>
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleSaveToStorage}
+            disabled={isSaving}
+            className="h-8 w-8"
+          >
+            <Save className="h-4 w-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>Сохранить в Storage</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 };
