@@ -7,7 +7,7 @@ export const processOpenAIRequest = async (job) => {
   try {
     const openai = await initOpenAI();
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model: "gpt-4",
       messages: [
         {
           role: "system",
@@ -15,8 +15,11 @@ export const processOpenAIRequest = async (job) => {
         },
         { role: "user", content: prompt }
       ],
+      temperature: 0.7,
+      max_tokens: 4000
     });
 
+    console.log('OpenAI response received successfully');
     return completion.choices[0].message.content;
   } catch (error) {
     console.error('OpenAI processing error:', error);

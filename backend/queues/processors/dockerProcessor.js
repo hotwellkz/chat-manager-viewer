@@ -24,12 +24,15 @@ async function createContainer(userId) {
     .from('docker_containers')
     .insert({
       user_id: userId,
-      status: 'creating'
+      status: 'creating',
+      container_logs: 'Initializing container...'
     })
     .select()
     .single();
 
   if (error) throw error;
+  
+  console.log('Container created:', container);
   return container;
 }
 
@@ -40,5 +43,7 @@ async function deleteContainer(containerId) {
     .eq('id', containerId);
 
   if (error) throw error;
+  
+  console.log('Container deleted:', containerId);
   return { success: true };
 }

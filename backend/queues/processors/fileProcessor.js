@@ -9,8 +9,15 @@ export const processFileGeneration = async (job) => {
   
   for (const file of files) {
     try {
+      console.log(`Processing file: ${file.path}`);
+      
+      // Сохраняем файл в Storage
       const uploadData = await saveToStorage(userId, file);
+      console.log('File saved to storage:', uploadData);
+
+      // Сохраняем метаданные
       const fileData = await saveFileMetadata(userId, file, uploadData);
+      console.log('File metadata saved:', fileData);
       
       results.push({
         path: file.path,
