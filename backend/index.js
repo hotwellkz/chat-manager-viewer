@@ -11,12 +11,13 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Настройка CORS для разрешения запросов с фронтенда
+// Включаем CORS до всех остальных middleware
 app.use(cors(corsOptions));
 
 // Добавляем промежуточное ПО для обработки preflight запросов
 app.options('*', cors(corsOptions));
 
+// Добавляем middleware для парсинга JSON
 app.use(express.json());
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -31,6 +32,15 @@ app.use('/uploads', express.static(uploadsDir));
 // Маршрут для проверки работоспособности
 app.get('/health', (req, res) => {
   res.json({ status: 'ok' });
+});
+
+// Обработка ошибок
+app.use((err, req, res, next) => {
+  console.error('Ошибка сервера:', err);
+  res.status(500).json({ 
+    error: 'Внутренняя ошибка сервера',
+    details: process.env.NODE_ENV === 'development' ? err.message : undefined
+  });
 });
 
 app.listen(port, '0.0.0.0', () => {
