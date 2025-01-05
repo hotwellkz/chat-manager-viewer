@@ -47,7 +47,7 @@ const LoginPage = () => {
         navigate("/");
       }
       
-      if (event === 'USER_DELETED' || event === 'SIGNED_OUT') {
+      if (event === 'SIGNED_OUT') {
         toast({
           title: "Выход из системы",
           description: "Вы успешно вышли из системы",
