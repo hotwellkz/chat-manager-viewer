@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import path from 'path';
+import { saveFileToStorage, saveFileMetadata } from '../services/fileService.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -27,78 +27,22 @@ export const handleFiles = async (req, res) => {
         contentLength: file.content?.length
       });
 
-      const filePath = `${userId}/${file.path}`;
-      
-      // Загружаем файл в Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('project_files')
-        .upload(filePath, file.content, {
-          contentType: 'text/plain',
-          upsert: true
+      try {
+        // Сохраняем файл в Storage
+        const uploadData = await saveFileToStorage(userId, file);
+        
+        // Сохраняем метаданные
+        const fileData = await saveFileMetadata(userId, file, uploadData);
+        
+        results.push({
+          path: file.path,
+          url: `/uploads/${file.path}`,
+          version: fileData.version
         });
-
-      if (uploadError) {
-        console.error('Ошибка загрузки в Storage:', uploadError);
-        throw uploadError;
+      } catch (error) {
+        console.error(`Ошибка при обработке файла ${file.path}:`, error);
+        throw error;
       }
-
-      console.log('Файл успешно загружен в Storage:', {
-        path: filePath,
-        uploadData
-      });
-
-      // Получаем текущую версию файла, если она существует
-      const { data: existingFile } = await supabase
-        .from('files')
-        .select('*')
-        .eq('file_path', filePath)
-        .single();
-
-      const version = existingFile ? (existingFile.version || 1) + 1 : 1;
-      const previousVersions = existingFile?.previous_versions || [];
-
-      if (existingFile) {
-        previousVersions.push({
-          version: existingFile.version || 1,
-          content: existingFile.content || '',
-          modified_at: existingFile.last_modified || new Date().toISOString(),
-          modified_by: existingFile.modified_by || userId
-        });
-      }
-
-      // Сохраняем метаданные
-      const { data: fileData, error: dbError } = await supabase
-        .from('files')
-        .upsert({
-          user_id: userId,
-          filename: path.basename(file.path),
-          file_path: filePath,
-          content_type: 'text/plain',
-          size: Buffer.byteLength(file.content, 'utf8'),
-          content: file.content,
-          version: version,
-          previous_versions: previousVersions,
-          last_modified: new Date().toISOString(),
-          modified_by: userId
-        })
-        .select()
-        .single();
-
-      if (dbError) {
-        console.error('Ошибка сохранения метаданных:', dbError);
-        throw dbError;
-      }
-
-      console.log('Метаданные файла сохранены:', {
-        id: fileData.id,
-        path: fileData.file_path
-      });
-      
-      results.push({
-        path: file.path,
-        url: `/uploads/${file.path}`,
-        version: version
-      });
     }
 
     console.log('Все файлы успешно обработаны:', {
