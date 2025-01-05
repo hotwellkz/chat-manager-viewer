@@ -18,6 +18,8 @@ serve(async (req) => {
       throw new Error('User ID is required')
     }
 
+    console.log('Preparing deployment for user:', userId)
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -30,43 +32,35 @@ serve(async (req) => {
       .eq('user_id', userId)
 
     if (filesError) {
+      console.error('Error fetching files:', filesError)
       throw filesError
     }
 
     if (!files || files.length === 0) {
+      console.error('No files found for user:', userId)
       throw new Error('No files found for deployment')
     }
 
-    // Создаем структуру проекта в памяти
-    const encoder = new TextEncoder()
+    console.log('Found files:', files.length)
+
+    // Создаем структуру проекта
     const projectStructure = {
-      files: [],
+      files: files.map(file => ({
+        name: file.file_path.split('/').pop(),
+        path: file.file_path,
+        content: file.content,
+        size: file.size,
+        type: file.content_type
+      })),
       metadata: {
-        filename: "project.zip",
-        version: "1.0.2",
-        containerId: "abc123",
-        lastModified: new Date().toISOString()
+        version: "1.0.0",
+        timestamp: new Date().toISOString()
       }
     }
 
-    // Добавляем каждый файл в структуру проекта
-    for (const file of files) {
-      const fileContent = encoder.encode(file.content)
-      projectStructure.files.push({
-        name: file.file_path,
-        content: Array.from(fileContent), // Конвертируем в обычный массив для JSON
-        size: file.size,
-        type: file.content_type
-      })
-    }
-
-    // Создаем JSON представление проекта
-    const projectJson = JSON.stringify(projectStructure, null, 2)
-    const projectData = encoder.encode(projectJson)
-
     // Сохраняем проект в storage
-    const timestamp = new Date().toISOString()
-    const projectPath = `${userId}/deployments/${timestamp}/project.json`
+    const projectPath = `${userId}/deployments/${projectStructure.metadata.timestamp}/project.json`
+    const projectData = new TextEncoder().encode(JSON.stringify(projectStructure))
 
     const { error: uploadError } = await supabase.storage
       .from('project_files')
@@ -76,46 +70,33 @@ serve(async (req) => {
       })
 
     if (uploadError) {
+      console.error('Error uploading project:', uploadError)
       throw uploadError
     }
 
-    // Получаем публичную ссылку на проект
-    const { data: { publicUrl }, error: urlError } = await supabase.storage
-      .from('project_files')
-      .getPublicUrl(projectPath)
-
-    if (urlError) {
-      throw urlError
-    }
-
-    // Обновляем статус проекта
-    const { error: updateError } = await supabase
+    // Создаем запись о деплойменте
+    const { error: deployError } = await supabase
       .from('deployed_projects')
-      .upsert({
+      .insert({
         user_id: userId,
-        status: 'packaging',
-        last_deployment: timestamp
+        status: 'preparing',
+        framework: files.find(f => f.file_path.includes('package.json'))?.content?.includes('react') ? 'react' : 'node'
       })
 
-    if (updateError) {
-      throw updateError
+    if (deployError) {
+      console.error('Error creating deployment record:', deployError)
+      throw deployError
     }
 
-    console.log('Project packaged successfully:', projectPath)
+    console.log('Deployment preparation completed successfully')
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: 'Project packaged successfully',
-        projectUrl: publicUrl,
+        message: 'Project prepared for deployment',
         metadata: projectStructure.metadata
       }),
-      { 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        } 
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
@@ -126,10 +107,7 @@ serve(async (req) => {
         error: error.message 
       }),
       { 
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json' 
-        },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400
       }
     )
