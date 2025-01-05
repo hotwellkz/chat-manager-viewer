@@ -26,13 +26,19 @@ export const createAndStartContainer = async (userId, projectId, framework, file
       ]
     };
 
-    // Проверяем подключение к Docker
+    // Проверяем подключение к Docker с расширенным логированием
+    console.log('Verifying Docker connection...');
     await docker.ping();
     console.log('Docker connection verified');
 
-    // Создаем контейнер
-    console.log('Creating container with config:', containerConfig);
+    // Получаем список существующих контейнеров
+    const containers = await docker.listContainers({ all: true });
+    console.log('Existing containers:', containers.length);
+
+    // Создаем контейнер с подробным логированием
+    console.log('Creating container with config:', JSON.stringify(containerConfig, null, 2));
     const container = await docker.createContainer(containerConfig);
+    console.log('Container created:', container.id);
     
     // Обновляем статус в базе данных
     await supabase
@@ -47,10 +53,18 @@ export const createAndStartContainer = async (userId, projectId, framework, file
     // Запускаем контейнер
     console.log('Starting container:', container.id);
     await container.start();
+    console.log('Container started successfully');
 
     // Получаем информацию о контейнере
     const containerInfo = await container.inspect();
+    console.log('Container info:', {
+      id: containerInfo.Id,
+      state: containerInfo.State,
+      network: containerInfo.NetworkSettings
+    });
+
     const containerUrl = `http://${containerInfo.NetworkSettings.IPAddress}:3000`;
+    console.log('Container URL:', containerUrl);
 
     // Обновляем статус после запуска
     await supabase
@@ -71,6 +85,11 @@ export const createAndStartContainer = async (userId, projectId, framework, file
 
   } catch (error) {
     console.error('Error in createAndStartContainer:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      statusCode: error.statusCode
+    });
     
     // Обновляем статус с ошибкой
     await supabase
