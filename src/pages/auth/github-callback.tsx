@@ -15,7 +15,7 @@ export const GitHubCallback = () => {
         const code = params.get('code');
         const state = params.get('state');
         
-        // Проверяем состояние для безопасности
+        // Проверяем состояние из localStorage
         const savedState = localStorage.getItem('github_oauth_state');
         if (state !== savedState) {
           throw new Error('Invalid state parameter');
@@ -28,9 +28,19 @@ export const GitHubCallback = () => {
           throw new Error('No code parameter');
         }
 
+        // Получаем текущую сессию
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          throw new Error('No active session');
+        }
+
         // Вызываем Edge Function для обмена кода на токен
         const { error } = await supabase.functions.invoke('github-integration', {
-          body: { code, action: 'auth' }
+          body: { 
+            code, 
+            action: 'auth',
+            accessToken: session.access_token 
+          }
         });
 
         if (error) throw error;
