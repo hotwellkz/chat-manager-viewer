@@ -46,6 +46,13 @@ const LoginPage = () => {
       if (event === 'SIGNED_IN' && session) {
         navigate("/");
       }
+      
+      if (event === 'USER_DELETED' || event === 'SIGNED_OUT') {
+        toast({
+          title: "Выход из системы",
+          description: "Вы успешно вышли из системы",
+        });
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -112,6 +119,8 @@ const LoginPage = () => {
                 loading_button_label: "Вход...",
                 social_provider_text: "Войти через {{provider}}",
                 link_text: "Уже есть аккаунт? Войти",
+                email_input_placeholder: "Ваш email",
+                password_input_placeholder: "Ваш пароль",
               },
               sign_up: {
                 email_label: "Email адрес",
@@ -120,9 +129,12 @@ const LoginPage = () => {
                 loading_button_label: "Регистрация...",
                 social_provider_text: "Зарегистрироваться через {{provider}}",
                 link_text: "Нет аккаунта? Зарегистрироваться",
+                email_input_placeholder: "Ваш email",
+                password_input_placeholder: "Придумайте пароль",
               },
               forgotten_password: {
                 email_label: "Email адрес",
+                password_label: "Пароль",
                 button_label: "Отправить инструкции",
                 loading_button_label: "Отправка инструкций...",
                 link_text: "Забыли пароль?",
