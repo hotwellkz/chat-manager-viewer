@@ -1,4 +1,5 @@
 import { supabase } from '../config/supabase.js';
+import { createAndStartContainer, getContainerLogs } from '../services/dockerService.js';
 
 export const handleDeployment = async (req, res) => {
   try {
@@ -86,47 +87,15 @@ export const handleDeployment = async (req, res) => {
     }, BUILD_TIMEOUT);
 
     try {
-      // Отправляем запрос на создание контейнера
-      const containerResponse = await fetch(`${process.env.DOCKER_SERVICE_URL}/containers/create`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId,
-          projectId: deployment.id,
-          framework,
-          files
-        })
-      });
+      // Создаем и запускаем Docker контейнер
+      const containerResult = await createAndStartContainer(
+        userId,
+        deployment.id,
+        framework,
+        files
+      );
 
-      if (!containerResponse.ok) {
-        throw new Error('Failed to create container');
-      }
-
-      const containerData = await containerResponse.json();
-      console.log('Container created:', containerData);
-
-      // Обновляем статус на packaging
-      await supabase
-        .from('deployed_projects')
-        .update({ 
-          status: 'packaging',
-          container_logs: 'Подготовка файлов для контейнера...',
-          last_deployment: new Date().toISOString()
-        })
-        .eq('id', deployment.id);
-
-      // Запускаем контейнер
-      const startResponse = await fetch(`${process.env.DOCKER_SERVICE_URL}/containers/${containerData.containerId}/start`, {
-        method: 'POST'
-      });
-
-      if (!startResponse.ok) {
-        throw new Error('Failed to start container');
-      }
-
-      // Генерируем URL для демонстрации
+      // Получаем URL для демонстрации
       const deploymentUrl = `https://lovable${deployment.id.slice(0, 6)}.netlify.app`;
 
       // Обновляем финальный статус
@@ -136,7 +105,7 @@ export const handleDeployment = async (req, res) => {
           status: 'deployed',
           project_url: deploymentUrl,
           last_deployment: new Date().toISOString(),
-          container_logs: 'Развертывание успешно завершено'
+          container_logs: await getContainerLogs(containerResult.containerId)
         })
         .eq('id', deployment.id);
 
@@ -153,7 +122,8 @@ export const handleDeployment = async (req, res) => {
       res.json({ 
         success: true, 
         deploymentUrl,
-        deploymentId: deployment.id
+        deploymentId: deployment.id,
+        containerId: containerResult.containerId
       });
 
     } catch (error) {
@@ -174,18 +144,6 @@ export const handleDeployment = async (req, res) => {
 
   } catch (error) {
     console.error('Deployment error:', error);
-
-    // Обновляем статус на ошибку, если есть ID развертывания
-    if (error.deploymentId) {
-      await supabase
-        .from('deployed_projects')
-        .update({ 
-          status: 'error',
-          last_deployment: new Date().toISOString(),
-          container_logs: `Ошибка: ${error.message || 'Неизвестная ошибка'}`
-        })
-        .eq('id', error.deploymentId);
-    }
 
     res.status(500).json({ 
       success: false, 
