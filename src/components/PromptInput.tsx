@@ -11,11 +11,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PreviewDeployment } from "./preview/PreviewDeployment";
 
 export const PromptInput = () => {
   const [prompt, setPrompt] = useState("");
   const [framework, setFramework] = useState("react");
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -30,12 +32,11 @@ export const PromptInput = () => {
     }
 
     setIsLoading(true);
+    setError(null);
+    
     try {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
-        console.error("Ошибка получения сессии:", sessionError);
-        throw new Error("Ошибка авторизации");
-      }
+      if (sessionError) throw new Error("Ошибка авторизации");
       
       if (!session) {
         toast({
@@ -47,10 +48,7 @@ export const PromptInput = () => {
       }
 
       const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError) {
-        console.error("Ошибка получения пользователя:", userError);
-        throw new Error("Ошибка получения данных пользователя");
-      }
+      if (userError) throw new Error("Ошибка получения данных пользователя");
 
       if (!user) {
         toast({
@@ -61,27 +59,6 @@ export const PromptInput = () => {
         return;
       }
 
-      // Сохраняем промт в историю чата
-      const { error: chatError } = await supabase
-        .from('chat_history')
-        .insert({
-          user_id: user.id,
-          prompt: prompt,
-          is_ai: false
-        });
-
-      if (chatError) {
-        console.error("Ошибка при сохранении в chat_history:", chatError);
-        throw new Error("Ошибка сохранения запроса");
-      }
-
-      console.log("Отправляем запрос:", {
-        prompt,
-        userId: user.id,
-        framework
-      });
-
-      // Отправляем запрос на бэкенд
       const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/prompt`, {
         method: "POST",
         headers: {
@@ -98,25 +75,24 @@ export const PromptInput = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("Ошибка от сервера:", errorData);
         throw new Error(errorData.error || "Ошибка при обработке запроса");
       }
       
       const data = await response.json();
-      console.log("Получен ответ:", data);
-
+      
       if (!data.success) {
         throw new Error("Неуспешный ответ от сервера");
       }
 
       toast({
         title: "Успешно!",
-        description: "Запрос обработан",
+        description: "Начинаем создание приложения",
       });
 
       setPrompt("");
     } catch (error) {
       console.error("Error:", error);
+      setError(error.message || "Произошла ошибка при обработке запроса");
       toast({
         title: "Ошибка",
         description: error.message || "Произошла ошибка при обработке запроса",
@@ -128,7 +104,7 @@ export const PromptInput = () => {
   };
 
   return (
-    <div className="p-4 border-t">
+    <div className="space-y-4">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="flex items-center gap-4">
           <Select
@@ -149,7 +125,7 @@ export const PromptInput = () => {
           <Textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Введите ваш запрос..."
+            placeholder="Опишите приложение, которое хотите создать..."
             className="min-h-[100px] pr-12"
           />
           <Button 
@@ -162,6 +138,8 @@ export const PromptInput = () => {
           </Button>
         </div>
       </form>
+
+      <PreviewDeployment onError={setError} />
     </div>
   );
 };
