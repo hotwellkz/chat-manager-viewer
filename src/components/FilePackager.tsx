@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Button } from "./ui/button";
 import { Archive } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Button } from "./ui/button";
+import { Tooltip } from "./ui/tooltip";
 
 export const FilePackager = () => {
   const [isPackaging, setIsPackaging] = useState(false);
@@ -25,7 +26,6 @@ export const FilePackager = () => {
         throw new Error(response.data?.error || 'Ошибка при упаковке файлов');
       }
 
-      // Получаем URL для скачивания
       const downloadUrl = response.data.downloadUrl;
 
       toast({
@@ -33,7 +33,6 @@ export const FilePackager = () => {
         description: "Файлы упакованы в ZIP архив",
       });
 
-      // Создаем ссылку для скачивания
       const link = document.createElement('a');
       link.href = downloadUrl;
       link.download = `project-${new Date().toISOString().slice(0, 10)}.zip`;
@@ -54,13 +53,16 @@ export const FilePackager = () => {
   };
 
   return (
-    <Button
-      onClick={handlePackageFiles}
-      disabled={isPackaging}
-      className="flex items-center gap-2"
-    >
-      <Archive className="h-4 w-4" />
-      {isPackaging ? 'Упаковка...' : 'Упаковать в ZIP'}
-    </Button>
+    <Tooltip content="Упаковать в ZIP">
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={handlePackageFiles}
+        disabled={isPackaging}
+        className="h-8 w-8"
+      >
+        <Archive className="h-4 w-4" />
+      </Button>
+    </Tooltip>
   );
 };
