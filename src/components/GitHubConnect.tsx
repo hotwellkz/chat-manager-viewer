@@ -29,8 +29,8 @@ export const GitHubConnect = () => {
       // Генерируем случайное состояние для безопасности
       const state = Math.random().toString(36).substring(7);
       
-      // Сохраняем состояние в sessionStorage для проверки после редиректа
-      sessionStorage.setItem('github_oauth_state', state);
+      // Сохраняем состояние в localStorage для сохранения между редиректами
+      localStorage.setItem('github_oauth_state', state);
 
       // Формируем URL для авторизации GitHub с правильным redirect_uri
       const redirectUri = `${window.location.origin}/auth/callback`;
