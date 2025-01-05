@@ -20,15 +20,34 @@ export const PromptInput = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!prompt.trim()) return;
+    if (!prompt.trim()) {
+      toast({
+        title: "Ошибка",
+        description: "Введите текст запроса",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setIsLoading(true);
     try {
+      // Получаем текущего пользователя
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         toast({
           title: "Ошибка",
           description: "Пользователь не авторизован",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Получаем текущую сессию для токена
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast({
+          title: "Ошибка",
+          description: "Сессия не найдена",
           variant: "destructive",
         });
         return;
@@ -43,7 +62,10 @@ export const PromptInput = () => {
           is_ai: false
         });
 
-      if (chatError) throw chatError;
+      if (chatError) {
+        console.error("Ошибка при сохранении в chat_history:", chatError);
+        throw chatError;
+      }
 
       // Формируем расширенный промт в зависимости от фреймворка
       let frameworkInstructions = "";
@@ -61,9 +83,11 @@ export const PromptInput = () => {
 
       const enhancedPrompt = `${frameworkInstructions}${prompt}`;
 
-      // Получаем токен сессии для авторизации
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('No active session');
+      console.log("Отправляем запрос:", {
+        prompt: enhancedPrompt,
+        userId: user.id,
+        framework
+      });
 
       // Отправляем запрос на бэкенд с правильными заголовками
       const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/prompt`, {
@@ -81,10 +105,12 @@ export const PromptInput = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
+        console.error("Ошибка от сервера:", errorData);
         throw new Error(errorData.message || "Ошибка при обработке запроса");
       }
       
       const data = await response.json();
+      console.log("Получен ответ:", data);
 
       toast({
         title: "Успешно!",
