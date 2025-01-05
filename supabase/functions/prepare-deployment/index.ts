@@ -26,6 +26,44 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
+    // Проверяем существующие проекты пользователя
+    console.log('Checking existing projects for user:', userId)
+    const { data: existingProjects, error: projectError } = await supabase
+      .from('deployed_projects')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'preparing')
+      .order('created_at', { ascending: false })
+      .limit(1)
+
+    if (projectError) {
+      console.error('Error checking existing projects:', projectError)
+      throw projectError
+    }
+
+    let projectId
+
+    if (existingProjects && existingProjects.length > 0) {
+      // Обновляем существующий проект
+      console.log('Updating existing project:', existingProjects[0].id)
+      const { data: updatedProject, error: updateError } = await supabase
+        .from('deployed_projects')
+        .update({
+          status: 'preparing',
+          last_deployment: new Date().toISOString()
+        })
+        .eq('id', existingProjects[0].id)
+        .select()
+        .single()
+
+      if (updateError) {
+        console.error('Error updating project:', updateError)
+        throw updateError
+      }
+
+      projectId = updatedProject.id
+    }
+
     // Получаем все файлы пользователя из базы данных
     console.log('Fetching files from database for user:', userId)
     const { data: dbFiles, error: dbError } = await supabase
@@ -120,8 +158,6 @@ serve(async (req) => {
       files = updatedFiles || []
     }
 
-    console.log('Processing files for deployment...')
-
     // Создаем структуру проекта
     const projectStructure = {
       files: files.map(file => ({
@@ -153,21 +189,6 @@ serve(async (req) => {
     if (uploadError) {
       console.error('Error uploading project:', uploadError)
       throw uploadError
-    }
-
-    // Создаем запись о деплойменте
-    console.log('Creating deployment record...')
-    const { error: deployError } = await supabase
-      .from('deployed_projects')
-      .insert({
-        user_id: userId,
-        status: 'preparing',
-        framework: files.find(f => f.file_path.includes('package.json'))?.content?.includes('react') ? 'react' : 'node'
-      })
-
-    if (deployError) {
-      console.error('Error creating deployment record:', deployError)
-      throw deployError
     }
 
     console.log('Deployment preparation completed successfully')
