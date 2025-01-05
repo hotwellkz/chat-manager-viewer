@@ -31,43 +31,39 @@ export const PromptInput = () => {
 
     setIsLoading(true);
     try {
-      // Получаем текущего пользователя
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast({
-          title: "Ошибка",
-          description: "Пользователь не авторизован",
-          variant: "destructive",
-        });
-        return;
+      // Получаем текущую сессию
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        console.error("Ошибка получения сессии:", sessionError);
+        throw new Error("Ошибка авторизации");
       }
-
-      // Получаем текущую сессию для токена
-      const { data: { session } } = await supabase.auth.getSession();
+      
       if (!session) {
         toast({
           title: "Ошибка",
-          description: "Сессия не найдена",
+          description: "Необходима авторизация",
           variant: "destructive",
         });
         return;
       }
 
-      // Сохраняем промт в chat_history
-      const { error: chatError } = await supabase
-        .from('chat_history')
-        .insert({
-          user_id: user.id,
-          prompt: prompt,
-          is_ai: false
-        });
-
-      if (chatError) {
-        console.error("Ошибка при сохранении в chat_history:", chatError);
-        throw chatError;
+      // Получаем текущего пользователя
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) {
+        console.error("Ошибка получения пользователя:", userError);
+        throw new Error("Ошибка получения данных пользователя");
       }
 
-      // Формируем расширенный промт в зависимости от фреймворка
+      if (!user) {
+        toast({
+          title: "Ошибка",
+          description: "Пользователь не найден",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Формируем расширенный промт
       let frameworkInstructions = "";
       switch (framework) {
         case "react":
@@ -83,19 +79,34 @@ export const PromptInput = () => {
 
       const enhancedPrompt = `${frameworkInstructions}${prompt}`;
 
+      // Сохраняем промт в историю чата
+      const { error: chatError } = await supabase
+        .from('chat_history')
+        .insert({
+          user_id: user.id,
+          prompt: prompt,
+          is_ai: false
+        });
+
+      if (chatError) {
+        console.error("Ошибка при сохранении в chat_history:", chatError);
+        throw new Error("Ошибка сохранения запроса");
+      }
+
       console.log("Отправляем запрос:", {
         prompt: enhancedPrompt,
         userId: user.id,
         framework
       });
 
-      // Отправляем запрос на бэкенд с правильными заголовками
+      // Отправляем запрос на бэкенд
       const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/prompt`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${session.access_token}`,
         },
+        credentials: 'include',
         body: JSON.stringify({ 
           prompt: enhancedPrompt,
           userId: user.id,
@@ -106,11 +117,15 @@ export const PromptInput = () => {
       if (!response.ok) {
         const errorData = await response.json();
         console.error("Ошибка от сервера:", errorData);
-        throw new Error(errorData.message || "Ошибка при обработке запроса");
+        throw new Error(errorData.error || "Ошибка при обработке запроса");
       }
       
       const data = await response.json();
       console.log("Получен ответ:", data);
+
+      if (!data.success) {
+        throw new Error("Неуспешный ответ от сервера");
+      }
 
       toast({
         title: "Успешно!",
