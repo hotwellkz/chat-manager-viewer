@@ -31,7 +31,6 @@ export const PromptInput = () => {
 
     setIsLoading(true);
     try {
-      // Получаем текущую сессию
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       if (sessionError) {
         console.error("Ошибка получения сессии:", sessionError);
@@ -47,7 +46,6 @@ export const PromptInput = () => {
         return;
       }
 
-      // Получаем текущего пользователя
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       if (userError) {
         console.error("Ошибка получения пользователя:", userError);
@@ -62,22 +60,6 @@ export const PromptInput = () => {
         });
         return;
       }
-
-      // Формируем расширенный промт
-      let frameworkInstructions = "";
-      switch (framework) {
-        case "react":
-          frameworkInstructions = "Создай полноценное React приложение с использованием следующих технологий: React Router для маршрутизации, Tailwind CSS для стилей, TypeScript для типизации. Структура должна включать компоненты, хуки, утилиты и страницы. ";
-          break;
-        case "node":
-          frameworkInstructions = "Создай полноценное Node.js приложение с использованием Express.js для сервера, MongoDB/Mongoose для базы данных, JWT для аутентификации. Структура должна включать роуты, контроллеры, модели и middleware. ";
-          break;
-        case "vue":
-          frameworkInstructions = "Создай полноценное Vue.js приложение с использованием Vue Router для маршрутизации, Vuex для управления состоянием, TypeScript для типизации. Структура должна включать компоненты, хранилище, миксины и страницы. ";
-          break;
-      }
-
-      const enhancedPrompt = `${frameworkInstructions}${prompt}`;
 
       // Сохраняем промт в историю чата
       const { error: chatError } = await supabase
@@ -94,7 +76,7 @@ export const PromptInput = () => {
       }
 
       console.log("Отправляем запрос:", {
-        prompt: enhancedPrompt,
+        prompt,
         userId: user.id,
         framework
       });
@@ -108,7 +90,7 @@ export const PromptInput = () => {
         },
         credentials: 'include',
         body: JSON.stringify({ 
-          prompt: enhancedPrompt,
+          prompt,
           userId: user.id,
           framework
         }),
