@@ -9,20 +9,43 @@ const supabase = createClient(
 export const handleFiles = async (req, res) => {
   try {
     const { files, userId } = req.body;
+    console.log('Получен запрос на сохранение файлов:', { 
+      filesCount: files?.length,
+      userId 
+    });
+
+    if (!files || !Array.isArray(files)) {
+      console.error('Ошибка: files не является массивом');
+      return res.status(400).json({ error: 'Invalid files data' });
+    }
+
     const results = [];
 
     for (const file of files) {
+      console.log('Обработка файла:', {
+        path: file.path,
+        contentLength: file.content?.length
+      });
+
       const filePath = `${userId}/${file.path}`;
       
       // Загружаем файл в Storage
-      const { error: uploadError } = await supabase.storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
         .from('project_files')
         .upload(filePath, file.content, {
           contentType: 'text/plain',
           upsert: true
         });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Ошибка загрузки в Storage:', uploadError);
+        throw uploadError;
+      }
+
+      console.log('Файл успешно загружен в Storage:', {
+        path: filePath,
+        uploadData
+      });
 
       // Получаем текущую версию файла, если она существует
       const { data: existingFile } = await supabase
@@ -44,7 +67,7 @@ export const handleFiles = async (req, res) => {
       }
 
       // Сохраняем метаданные
-      const { error: dbError } = await supabase
+      const { data: fileData, error: dbError } = await supabase
         .from('files')
         .upsert({
           user_id: userId,
@@ -57,9 +80,19 @@ export const handleFiles = async (req, res) => {
           previous_versions: previousVersions,
           last_modified: new Date().toISOString(),
           modified_by: userId
-        });
+        })
+        .select()
+        .single();
 
-      if (dbError) throw dbError;
+      if (dbError) {
+        console.error('Ошибка сохранения метаданных:', dbError);
+        throw dbError;
+      }
+
+      console.log('Метаданные файла сохранены:', {
+        id: fileData.id,
+        path: fileData.file_path
+      });
       
       results.push({
         path: file.path,
@@ -68,16 +101,24 @@ export const handleFiles = async (req, res) => {
       });
     }
 
+    console.log('Все файлы успешно обработаны:', {
+      count: results.length
+    });
+
     res.json({ files: results });
   } catch (error) {
-    console.error('Error:', error);
-    res.status(500).json({ error: 'Failed to save files' });
+    console.error('Критическая ошибка при обработке файлов:', error);
+    res.status(500).json({ 
+      error: 'Failed to save files',
+      details: error.message 
+    });
   }
 };
 
 export const handleUpdateFiles = async (req, res) => {
   try {
     const { prompt, userId } = req.body;
+    console.log('Получен запрос на обновление файлов:', { userId });
 
     // Получаем список файлов пользователя
     const { data: files, error: filesError } = await supabase
@@ -85,7 +126,10 @@ export const handleUpdateFiles = async (req, res) => {
       .select('*')
       .eq('user_id', userId);
 
-    if (filesError) throw filesError;
+    if (filesError) {
+      console.error('Ошибка получения файлов:', filesError);
+      throw filesError;
+    }
 
     const openai = await initOpenAI();
     const completion = await openai.chat.completions.create({
@@ -110,9 +154,16 @@ Please analyze these files and provide necessary updates.`
     });
 
     const response = JSON.parse(completion.choices[0].message.content);
+    console.log('Получен ответ от OpenAI:', {
+      filesCount: response.files?.length
+    });
 
     for (const file of response.files) {
       const filePath = `${userId}/${file.path}`;
+      console.log('Обработка файла:', {
+        action: file.action,
+        path: filePath
+      });
       
       if (file.action === 'delete') {
         // Удаляем файл из Storage
@@ -120,7 +171,10 @@ Please analyze these files and provide necessary updates.`
           .from('project_files')
           .remove([filePath]);
 
-        if (deleteError) throw deleteError;
+        if (deleteError) {
+          console.error('Ошибка удаления из Storage:', deleteError);
+          throw deleteError;
+        }
 
         // Удаляем метаданные
         const { error: dbError } = await supabase
@@ -128,7 +182,12 @@ Please analyze these files and provide necessary updates.`
           .delete()
           .eq('file_path', filePath);
 
-        if (dbError) throw dbError;
+        if (dbError) {
+          console.error('Ошибка удаления метаданных:', dbError);
+          throw dbError;
+        }
+
+        console.log('Файл успешно удален:', { path: filePath });
       } else if (file.action === 'add' || file.action === 'update') {
         // Получаем текущую версию файла, если она существует
         const { data: existingFile } = await supabase
@@ -157,7 +216,12 @@ Please analyze these files and provide necessary updates.`
             upsert: true
           });
 
-        if (uploadError) throw uploadError;
+        if (uploadError) {
+          console.error('Ошибка загрузки в Storage:', uploadError);
+          throw uploadError;
+        }
+
+        console.log('Файл успешно загружен в Storage:', { path: filePath });
 
         // Обновляем или добавляем метаданные
         const { error: dbError } = await supabase
@@ -175,7 +239,15 @@ Please analyze these files and provide necessary updates.`
             modified_by: userId
           });
 
-        if (dbError) throw dbError;
+        if (dbError) {
+          console.error('Ошибка сохранения метаданных:', dbError);
+          throw dbError;
+        }
+
+        console.log('Метаданные файла обновлены:', {
+          path: filePath,
+          version
+        });
       }
     }
 
@@ -185,7 +257,7 @@ Please analyze these files and provide necessary updates.`
       description: response.description
     });
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Критическая ошибка при обновлении файлов:', error);
     res.status(500).json({ 
       success: false, 
       error: 'Failed to update files',
