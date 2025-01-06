@@ -31,12 +31,32 @@ export const SaveToStorageButton = () => {
         return;
       }
 
-      console.log('Отправка файлов на сервер:', {
+      console.log('Начало сохранения файлов:', {
         filesCount: files.length,
         userId: session.user.id
       });
 
-      // Сохраняем файлы
+      // Сначала сохраняем файлы в Storage
+      for (const file of files) {
+        const filePath = `${session.user.id}/${file.name}`;
+        const fileContent = new TextEncoder().encode(file.content);
+
+        console.log(`Сохранение файла ${file.name} в Storage...`);
+        
+        const { error: uploadError } = await supabase.storage
+          .from('project_files')
+          .upload(filePath, fileContent, {
+            contentType: 'text/plain',
+            upsert: true
+          });
+
+        if (uploadError) {
+          console.error('Ошибка загрузки файла в Storage:', uploadError);
+          throw uploadError;
+        }
+      }
+
+      // Затем сохраняем метаданные в базу данных
       const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/files`, {
         method: "POST",
         headers: {
@@ -66,7 +86,7 @@ export const SaveToStorageButton = () => {
           description: "Файлы сохранены",
         });
 
-        // Автоматически запускаем развертывание
+        // Запускаем процесс развертывания
         const deployResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/deploy`, {
           method: "POST",
           headers: {
@@ -99,7 +119,7 @@ export const SaveToStorageButton = () => {
       console.error("Error:", error);
       toast({
         title: "Ошибка",
-        description: error.message || "Произошла ошибка",
+        description: error.message || "Произошла ошибка при сохранении",
         variant: "destructive",
       });
     }
