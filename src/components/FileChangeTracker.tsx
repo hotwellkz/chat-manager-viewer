@@ -24,6 +24,13 @@ export const FileChangeTracker = () => {
   const [validationResults, setValidationResults] = useState<Record<string, boolean>>({});
   const { toast } = useToast();
 
+  // Автоматическое сохранение при изменении файлов
+  useEffect(() => {
+    if (changes.length > 0 && areAllFilesValid()) {
+      handleAutoSave();
+    }
+  }, [changes, validationResults]);
+
   useEffect(() => {
     const channel = supabase
       .channel('file-changes')
@@ -62,6 +69,59 @@ export const FileChangeTracker = () => {
 
   const areAllFilesValid = () => {
     return changes.every(change => validationResults[change.path]);
+  };
+
+  // Новая функция автоматического сохранения
+  const handleAutoSave = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        console.error('Нет активной сессии');
+        return;
+      }
+
+      console.log('Автоматическое сохранение файлов:', {
+        filesCount: changes.length,
+        userId: session.user.id
+      });
+
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/files`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          userId: session.user.id,
+          files: changes.map(f => ({
+            path: f.path,
+            content: f.content
+          }))
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.details || error.error || "Ошибка при сохранении файлов");
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        console.log('Файлы успешно сохранены автоматически');
+        setChanges([]);
+        setValidationResults({});
+      }
+    } catch (error) {
+      console.error("Error during auto-save:", error);
+      toast({
+        title: "Ошибка автосохранения",
+        description: error.message || "Произошла ошибка при автоматическом сохранении",
+        variant: "destructive",
+      });
+    }
   };
 
   const syncWithGitHub = async () => {

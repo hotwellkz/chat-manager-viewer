@@ -20,6 +20,77 @@ export const PromptInput = () => {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
+  // Новая функция автоматического сохранения после получения ответа
+  const handleAutoSaveAfterPrompt = async (files: any[], userId: string, token: string) => {
+    try {
+      console.log('Автоматическое сохранение после получения ответа:', {
+        filesCount: files.length,
+        userId
+      });
+
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/files`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          userId,
+          files: files.map(f => ({
+            path: f.name || f.path,
+            content: f.content
+          }))
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Ошибка при сохранении файлов");
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        console.log('Файлы успешно сохранены после получения ответа');
+        
+        // Автоматически запускаем развертывание
+        const deployResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/deploy`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            userId,
+            files: result.files,
+            framework
+          }),
+        });
+
+        if (!deployResponse.ok) {
+          throw new Error("Ошибка при запуске развертывания");
+        }
+
+        const deployResult = await deployResponse.json();
+        
+        if (deployResult.success) {
+          toast({
+            title: "Успешно",
+            description: "Файлы сохранены и начато развертывание",
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error during auto-save after prompt:", error);
+      toast({
+        title: "Ошибка",
+        description: error.message || "Произошла ошибка при автоматическом сохранении",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!prompt.trim()) {
@@ -82,6 +153,11 @@ export const PromptInput = () => {
       
       if (!data.success) {
         throw new Error("Неуспешный ответ от сервера");
+      }
+
+      // Автоматически сохраняем файлы после получения ответа
+      if (data.files && data.files.length > 0) {
+        await handleAutoSaveAfterPrompt(data.files, user.id, session.access_token);
       }
 
       toast({
