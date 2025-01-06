@@ -12,7 +12,25 @@ interface ChatMessage {
   timestamp: string;
   is_ai: boolean;
   status: 'pending' | 'processing' | 'completed' | 'error';
+  user_id?: string;
+  response?: string;
 }
+
+const isValidStatus = (status: string): status is ChatMessage['status'] => {
+  return ['pending', 'processing', 'completed', 'error'].includes(status);
+};
+
+const validateMessage = (message: any): ChatMessage => {
+  return {
+    id: message.id,
+    prompt: message.prompt,
+    timestamp: message.timestamp,
+    is_ai: message.is_ai,
+    status: isValidStatus(message.status) ? message.status : 'pending',
+    user_id: message.user_id,
+    response: message.response
+  };
+};
 
 const StatusBadge = ({ status }: { status: ChatMessage['status'] }) => {
   const variants = {
@@ -60,7 +78,7 @@ export const ChatHistory = () => {
       }
 
       console.log('Получено сообщений:', data?.length);
-      setMessages(data || []);
+      setMessages((data || []).map(validateMessage));
     } catch (error) {
       console.error('Ошибка при загрузке сообщений:', error);
       toast({
@@ -86,10 +104,10 @@ export const ChatHistory = () => {
         (payload) => {
           console.log('Получено обновление чата:', payload);
           if (payload.eventType === 'INSERT') {
-            setMessages(prev => [...prev, payload.new as ChatMessage]);
+            setMessages(prev => [...prev, validateMessage(payload.new)]);
           } else if (payload.eventType === 'UPDATE') {
             setMessages(prev => prev.map(msg => 
-              msg.id === payload.new.id ? { ...msg, ...payload.new } : msg
+              msg.id === payload.new.id ? validateMessage({ ...msg, ...payload.new }) : msg
             ));
           }
         }
