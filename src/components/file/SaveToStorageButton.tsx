@@ -2,7 +2,6 @@ import { Save } from "lucide-react";
 import { Button } from "../ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery } from "@tanstack/react-query";
 
 export const SaveToStorageButton = () => {
   const { toast } = useToast();
@@ -20,6 +19,23 @@ export const SaveToStorageButton = () => {
         return;
       }
 
+      // Получаем список файлов из localStorage
+      const files = JSON.parse(localStorage.getItem('editorFiles') || '[]');
+      
+      if (!files.length) {
+        toast({
+          title: "Ошибка",
+          description: "Нет файлов для сохранения",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('Отправка файлов на сервер:', {
+        filesCount: files.length,
+        userId: session.user.id
+      });
+
       // Сохраняем файлы
       const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/files`, {
         method: "POST",
@@ -30,11 +46,16 @@ export const SaveToStorageButton = () => {
         credentials: 'include',
         body: JSON.stringify({
           userId: session.user.id,
+          files: files.map(f => ({
+            path: f.name,
+            content: f.content
+          }))
         }),
       });
 
       if (!response.ok) {
-        throw new Error("Ошибка при сохранении файлов");
+        const error = await response.json();
+        throw new Error(error.details || error.error || "Ошибка при сохранении файлов");
       }
 
       const result = await response.json();
@@ -56,12 +77,13 @@ export const SaveToStorageButton = () => {
           body: JSON.stringify({
             userId: session.user.id,
             files: result.files,
-            framework: 'react' // По умолчанию используем React
+            framework: 'react'
           }),
         });
 
         if (!deployResponse.ok) {
-          throw new Error("Ошибка при запуске развертывания");
+          const deployError = await deployResponse.json();
+          throw new Error(deployError.details || deployError.error || "Ошибка при запуске развертывания");
         }
 
         const deployResult = await deployResponse.json();

@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { BuildControls } from "./BuildControls";
-import { DeploymentLink } from "./DeploymentLink";
 import { DeploymentProgress } from "./DeploymentProgress";
 import { DeploymentSteps } from "./DeploymentSteps";
 import { PlayCircle, Loader2 } from "lucide-react";
@@ -33,28 +31,45 @@ export const DockerBuildManager = () => {
       setError(null);
       setBuildStage('preparing');
       
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
       
-      if (!user) {
+      if (!session) {
         throw new Error('Пользователь не авторизован');
       }
+
+      // Получаем список файлов из localStorage
+      const files = JSON.parse(localStorage.getItem('editorFiles') || '[]');
+      
+      if (!files.length) {
+        throw new Error('Нет файлов для сборки');
+      }
+
+      console.log('Начинаем сборку:', {
+        filesCount: files.length,
+        userId: session.user.id
+      });
 
       // Запускаем процесс сборки
       const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/deploy`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+          "Authorization": `Bearer ${session.access_token}`,
         },
         credentials: 'include',
         body: JSON.stringify({
-          userId: user.id,
+          userId: session.user.id,
+          files: files.map(f => ({
+            path: f.name,
+            content: f.content
+          })),
           framework: 'react'
         }),
       });
 
       if (!response.ok) {
-        throw new Error("Ошибка при запуске сборки");
+        const error = await response.json();
+        throw new Error(error.details || error.error || "Ошибка при запуске сборки");
       }
 
       const result = await response.json();
@@ -74,7 +89,7 @@ export const DockerBuildManager = () => {
       toast({
         variant: "destructive",
         title: "Ошибка",
-        description: "Не удалось запустить сборку",
+        description: error.message || "Не удалось запустить сборку",
       });
     } finally {
       setIsBuilding(false);
@@ -102,8 +117,10 @@ export const DockerBuildManager = () => {
         </span>
       </div>
       
-      {deployedUrl && (
-        <DeploymentLink url={deployedUrl} />
+      {error && (
+        <span className="text-sm text-destructive">
+          {error}
+        </span>
       )}
     </div>
   );
