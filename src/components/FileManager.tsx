@@ -19,6 +19,10 @@ export const FileManager = () => {
 
   useEffect(() => {
     fetchFiles();
+    const channel = setupRealtimeSubscription();
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchFiles = async () => {
@@ -26,23 +30,53 @@ export const FileManager = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      console.log('Загрузка файлов для пользователя:', user.id);
+
       const { data, error } = await supabase
         .from('files')
         .select('*')
         .eq('user_id', user.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Ошибка при загрузке файлов:', error);
+        throw error;
+      }
 
+      console.log('Получено файлов:', data?.length);
       const fileTree = buildFileTree(data || []);
       setFiles(fileTree);
     } catch (error) {
-      console.error('Error fetching files:', error);
+      console.error('Ошибка при загрузке файлов:', error);
       toast({
         title: "Ошибка",
         description: "Не удалось загрузить список файлов",
         variant: "destructive",
       });
     }
+  };
+
+  const setupRealtimeSubscription = () => {
+    console.log('Настройка real-time подписки для файлов');
+    
+    const channel = supabase
+      .channel('files_updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'files'
+        },
+        async (payload) => {
+          console.log('Получено обновление файлов:', payload);
+          await fetchFiles(); // Перезагружаем все файлы для обновления дерева
+        }
+      )
+      .subscribe((status) => {
+        console.log('Статус подписки:', status);
+      });
+
+    return channel;
   };
 
   const buildFileTree = (files: any[]): FileNode[] => {
