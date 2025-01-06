@@ -1,11 +1,11 @@
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
-import { ContainerMetrics } from "./ContainerMetrics";
-import { ContainerMetricsChart } from "./ContainerMetricsChart";
-import { ContainerStatusBadge } from "./container/ContainerStatusBadge";
-import { ContainerActions } from "./container/ContainerActions";
-import { ContainerStatusWebSocket } from "./container/ContainerStatusWebSocket";
+import { ContainerMetrics } from "@/components/ContainerMetrics";
+import { ContainerMetricsChart } from "@/components/ContainerMetricsChart";
+import { ContainerStatusBadge } from "@/components/container/ContainerStatusBadge";
+import { ContainerActions } from "@/components/container/ContainerActions";
+import { ContainerStatusWebSocket } from "@/components/container/ContainerStatusWebSocket";
 import { useQuery } from "@tanstack/react-query";
 
 interface ContainerStatusProps {
