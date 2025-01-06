@@ -10,6 +10,15 @@ import {
 
 const router = express.Router();
 
+// Базовый маршрут для проверки API
+router.get('/', (req, res) => {
+  res.json({ 
+    status: 'ok',
+    message: 'Docker API is running',
+    version: 'v1.41'
+  });
+});
+
 router.post('/prompt', handlePrompt);
 router.post('/files', handleFiles);
 router.post('/files/update', handleUpdateFiles);
