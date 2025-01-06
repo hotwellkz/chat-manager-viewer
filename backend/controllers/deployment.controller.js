@@ -5,30 +5,95 @@ import { calculateBuildTimeout, shouldRetryBuild } from '../utils/deploymentUtil
 export const handleDeployment = async (req, res) => {
   try {
     const { userId, files, framework } = req.body;
+
+    // Добавляем валидацию входных данных
+    if (!userId || !files || !framework) {
+      console.error('Missing required fields:', { userId, filesCount: files?.length, framework });
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: userId, files, or framework'
+      });
+    }
+
+    if (!Array.isArray(files) || files.length === 0) {
+      console.error('Files must be a non-empty array');
+      return res.status(400).json({
+        success: false,
+        error: 'Files must be a non-empty array'
+      });
+    }
+
     const MAX_RETRIES = 3;
     let currentRetry = 0;
     let timeoutId;
 
-    console.log('Starting deployment process for user:', userId);
+    console.log('Starting deployment process for user:', userId, 'framework:', framework, 'files count:', files.length);
 
-    // Создаем новую запись о развертывании
-    const { data: deployment, error: deploymentError } = await supabase
+    // Проверяем существующий проект
+    const { data: existingProject, error: existingError } = await supabase
       .from('deployed_projects')
-      .insert({
-        user_id: userId,
-        framework: framework,
-        status: 'preparing',
-        container_logs: 'Создание нового проекта...'
-      })
-      .select()
+      .select('*')
+      .eq('user_id', userId)
+      .eq('framework', framework)
       .single();
 
-    if (deploymentError) {
-      console.error('Error creating deployment record:', deploymentError);
-      throw deploymentError;
+    if (existingError && existingError.code !== 'PGRST116') {
+      console.error('Error checking existing project:', existingError);
+      return res.status(500).json({
+        success: false,
+        error: 'Error checking existing project'
+      });
     }
 
-    console.log('Created new deployment record:', deployment.id);
+    let deployment;
+
+    if (existingProject) {
+      console.log('Updating existing project:', existingProject.id);
+      const { data: updatedProject, error: updateError } = await supabase
+        .from('deployed_projects')
+        .update({
+          status: 'preparing',
+          container_logs: 'Обновление существующего проекта...',
+          last_deployment: new Date().toISOString()
+        })
+        .eq('id', existingProject.id)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('Error updating existing project:', updateError);
+        return res.status(500).json({
+          success: false,
+          error: 'Error updating existing project'
+        });
+      }
+
+      deployment = updatedProject;
+    } else {
+      console.log('Creating new project for framework:', framework);
+      const { data: newProject, error: createError } = await supabase
+        .from('deployed_projects')
+        .insert({
+          user_id: userId,
+          framework: framework,
+          status: 'preparing',
+          container_logs: 'Создание нового проекта...'
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('Error creating new project:', createError);
+        return res.status(500).json({
+          success: false,
+          error: 'Error creating new project'
+        });
+      }
+
+      deployment = newProject;
+    }
+
+    console.log('Working with deployment:', deployment.id);
 
     // Рассчитываем таймаут на основе размера и сложности проекта
     const BUILD_TIMEOUT = calculateBuildTimeout(files, framework);
@@ -57,7 +122,7 @@ export const handleDeployment = async (req, res) => {
             })
             .eq('id', deployment.id);
 
-          res.status(408).json({ 
+          return res.status(408).json({ 
             success: false, 
             error: `Превышено время ожидания сборки после ${MAX_RETRIES} попыток`
           });
@@ -81,6 +146,10 @@ export const handleDeployment = async (req, res) => {
           files
         );
 
+        if (!containerResult || !containerResult.containerId) {
+          throw new Error('Failed to create container: Invalid container result');
+        }
+
         const deploymentUrl = `https://docker-jy4o.onrender.com/container/${deployment.id}`;
 
         // Обновляем финальный статус
@@ -103,7 +172,7 @@ export const handleDeployment = async (req, res) => {
 
         console.log('Deployment completed successfully:', deploymentUrl);
 
-        res.json({ 
+        return res.json({ 
           success: true, 
           deploymentUrl,
           deploymentId: deployment.id,
@@ -137,7 +206,7 @@ export const handleDeployment = async (req, res) => {
   } catch (error) {
     console.error('Deployment error:', error);
 
-    res.status(500).json({ 
+    return res.status(500).json({ 
       success: false, 
       error: error.message || 'Failed to deploy project'
     });

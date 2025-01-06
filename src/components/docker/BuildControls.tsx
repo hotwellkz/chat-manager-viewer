@@ -59,8 +59,18 @@ export const BuildControls = ({ isBuilding, onBuild, metadata }: BuildControlsPr
       }
 
       // Определяем фреймворк на основе package.json
-      const packageJson = files.find(f => f.file_path.includes('package.json'));
-      const framework = packageJson?.content?.includes('react') ? 'react' : 'node';
+      const packageJsonFile = files.find(f => f.file_path.includes('package.json'));
+      const framework = packageJsonFile?.content?.includes('react') ? 'react' : 'node';
+
+      console.log('Starting build with files:', {
+        filesCount: files.length,
+        userId: user.id,
+        framework,
+        files: files.map(f => ({
+          path: f.file_path,
+          content: f.content
+        }))
+      });
 
       // Запускаем процесс развертывания
       const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/deploy`, {
@@ -72,13 +82,17 @@ export const BuildControls = ({ isBuilding, onBuild, metadata }: BuildControlsPr
         credentials: 'include',
         body: JSON.stringify({
           userId: user.id,
-          files: files,
+          files: files.map(f => ({
+            path: f.file_path,
+            content: f.content
+          })),
           framework: framework
         }),
       });
 
       if (!response.ok) {
-        throw new Error("Ошибка при запуске развертывания");
+        const errorData = await response.json();
+        throw new Error(errorData.details || errorData.error || "Ошибка при запуске развертывания");
       }
 
       const result = await response.json();
