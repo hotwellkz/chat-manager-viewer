@@ -16,7 +16,6 @@ export const ContainerStatusWebSocket = ({
   const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
   const isConnectingRef = useRef(false);
 
-  // Дебаунсим функцию обновления статуса
   const debouncedStatusUpdate = debounce((status: string, url: string | null) => {
     onStatusUpdate(status, url);
   }, 1000);
@@ -26,13 +25,11 @@ export const ContainerStatusWebSocket = ({
     
     const setupWebSocket = async () => {
       try {
-        // Проверяем, не идет ли уже подключение
         if (isConnectingRef.current) {
           console.log('Подключение уже в процессе');
           return;
         }
 
-        // Закрываем предыдущее соединение если оно есть
         if (wsRef.current) {
           console.log('Закрываем предыдущее соединение');
           wsRef.current.close();
@@ -63,17 +60,33 @@ export const ContainerStatusWebSocket = ({
 
         ws.onmessage = (event) => {
           try {
-            const update = JSON.parse(event.data);
-            console.log('Получено обновление:', update);
+            const message = JSON.parse(event.data);
             
-            if (update.new && update.new.id === containerId) {
-              debouncedStatusUpdate(update.new.status, update.new.container_url);
+            switch (message.type) {
+              case 'ping':
+                ws.send(JSON.stringify({ type: 'pong' }));
+                break;
               
-              if (update.new.status === 'running' && isMounted) {
-                toast.success('Контейнер успешно запущен!');
-              } else if (update.new.status === 'error' && isMounted) {
-                toast.error('Ошибка при запуске контейнера');
-              }
+              case 'state':
+              case 'update':
+                if (message.data) {
+                  console.log('Получено обновление:', message.data);
+                  debouncedStatusUpdate(message.data.status, message.data.container_url);
+                  
+                  if (message.data.status === 'running' && isMounted) {
+                    toast.success('Контейнер успешно запущен!');
+                  } else if (message.data.status === 'error' && isMounted) {
+                    toast.error('Ошибка при запуске контейнера');
+                  }
+                }
+                break;
+              
+              case 'error':
+                console.error('Ошибка WebSocket:', message.message);
+                if (isMounted) {
+                  toast.error(message.message || 'Ошибка подключения к статусу контейнера');
+                }
+                break;
             }
           } catch (error) {
             console.error('Ошибка обработки сообщения:', error);
