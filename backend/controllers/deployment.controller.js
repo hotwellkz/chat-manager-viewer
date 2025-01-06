@@ -95,8 +95,8 @@ export const handleDeployment = async (req, res) => {
         files
       );
 
-      // Получаем URL для демонстрации
-      const deploymentUrl = `https://lovable${deployment.id.slice(0, 6)}.netlify.app`;
+      // Получаем URL для демонстрации (используем новый домен)
+      const deploymentUrl = `https://docker-jy4o.onrender.com/container/${deployment.id}`;
 
       // Обновляем финальный статус
       const { error: finalUpdateError } = await supabase
