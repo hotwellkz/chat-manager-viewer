@@ -15,10 +15,12 @@ router.get('/', (req, res) => {
   res.json({ 
     status: 'ok',
     message: 'Docker API is running',
-    version: 'v1.41'
+    version: 'v1.41',
+    timestamp: new Date().toISOString()
   });
 });
 
+// Маршруты для работы с промптами и файлами
 router.post('/prompt', handlePrompt);
 router.post('/files', handleFiles);
 router.post('/files/update', handleUpdateFiles);
@@ -29,4 +31,5 @@ router.post('/containers', createContainer);
 router.get('/containers/:containerId/status', getContainerStatus);
 router.delete('/containers/:containerId', deleteContainer);
 
+// Экспортируем роутер как default
 export default router;
