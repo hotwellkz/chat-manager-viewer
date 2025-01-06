@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { DeploymentProgress } from "./DeploymentProgress";
@@ -37,19 +37,28 @@ export const DockerBuildManager = () => {
         throw new Error('Пользователь не авторизован');
       }
 
-      // Получаем список файлов из localStorage
-      const files = JSON.parse(localStorage.getItem('editorFiles') || '[]');
-      
-      if (!files.length) {
-        throw new Error('Нет файлов для сборки');
+      // Получаем файлы из Supabase
+      const { data: supabaseFiles, error: filesError } = await supabase
+        .from('files')
+        .select('*')
+        .eq('user_id', session.user.id);
+
+      if (filesError) {
+        console.error('Error fetching files:', filesError);
+        throw new Error('Ошибка при получении файлов');
       }
 
-      console.log('Начинаем сборку:', {
-        filesCount: files.length,
+      // Проверяем наличие файлов
+      if (!supabaseFiles || supabaseFiles.length === 0) {
+        throw new Error('Нет файлов для сборки. Создайте хотя бы один файл.');
+      }
+
+      console.log('Starting build with files:', {
+        filesCount: supabaseFiles.length,
         userId: session.user.id
       });
 
-      // Запускаем процесс сборки
+      // Запускаем процесс сборки с файлами из Supabase
       const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/deploy`, {
         method: "POST",
         headers: {
@@ -59,8 +68,8 @@ export const DockerBuildManager = () => {
         credentials: 'include',
         body: JSON.stringify({
           userId: session.user.id,
-          files: files.map(f => ({
-            path: f.name,
+          files: supabaseFiles.map(f => ({
+            path: f.file_path.split('/').pop() || f.filename,
             content: f.content
           })),
           framework: 'react'
@@ -79,7 +88,7 @@ export const DockerBuildManager = () => {
         setDeployedUrl(result.deploymentUrl);
         toast({
           title: "Успешно",
-          description: "Сборка завершена успешно",
+          description: "Сборка запущена успешно",
         });
       }
     } catch (error) {
