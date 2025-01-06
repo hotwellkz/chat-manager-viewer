@@ -1,34 +1,64 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { debounce } from "lodash";
 
 interface ContainerStatusWebSocketProps {
   containerId: string;
   onStatusUpdate: (status: string, url: string | null) => void;
 }
 
-export const ContainerStatusWebSocket = ({ containerId, onStatusUpdate }: ContainerStatusWebSocketProps) => {
+export const ContainerStatusWebSocket = ({ 
+  containerId, 
+  onStatusUpdate 
+}: ContainerStatusWebSocketProps) => {
+  const wsRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
+  const isConnectingRef = useRef(false);
+
+  // Дебаунсим функцию обновления статуса
+  const debouncedStatusUpdate = debounce((status: string, url: string | null) => {
+    onStatusUpdate(status, url);
+  }, 1000);
+
   useEffect(() => {
-    let ws: WebSocket | null = null;
+    let isMounted = true;
     
     const setupWebSocket = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          console.error('Нет активной сессии');
+        // Проверяем, не идет ли уже подключение
+        if (isConnectingRef.current) {
+          console.log('Подключение уже в процессе');
           return;
         }
 
-        // Формируем корректный URL для WebSocket
+        // Закрываем предыдущее соединение если оно есть
+        if (wsRef.current) {
+          console.log('Закрываем предыдущее соединение');
+          wsRef.current.close();
+          wsRef.current = null;
+        }
+
+        isConnectingRef.current = true;
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session || !isMounted) {
+          console.error('Нет активной сессии или компонент размонтирован');
+          return;
+        }
+
         const wsUrl = `${import.meta.env.VITE_BACKEND_URL.replace('https://', 'wss://')}/api/container-status?jwt=${session.access_token}&containerId=${containerId}`;
         
-        console.log('Подключение к WebSocket:', wsUrl);
-        
-        ws = new WebSocket(wsUrl);
+        console.log('Создание нового WebSocket подключения');
+        const ws = new WebSocket(wsUrl);
+        wsRef.current = ws;
 
         ws.onopen = () => {
           console.log('WebSocket подключен');
-          toast.success('Подключено к статусу контейнера');
+          isConnectingRef.current = false;
+          if (isMounted) {
+            toast.success('Подключено к статусу контейнера');
+          }
         };
 
         ws.onmessage = (event) => {
@@ -37,11 +67,11 @@ export const ContainerStatusWebSocket = ({ containerId, onStatusUpdate }: Contai
             console.log('Получено обновление:', update);
             
             if (update.new && update.new.id === containerId) {
-              onStatusUpdate(update.new.status, update.new.container_url);
+              debouncedStatusUpdate(update.new.status, update.new.container_url);
               
-              if (update.new.status === 'running') {
+              if (update.new.status === 'running' && isMounted) {
                 toast.success('Контейнер успешно запущен!');
-              } else if (update.new.status === 'error') {
+              } else if (update.new.status === 'error' && isMounted) {
                 toast.error('Ошибка при запуске контейнера');
               }
             }
@@ -52,30 +82,52 @@ export const ContainerStatusWebSocket = ({ containerId, onStatusUpdate }: Contai
 
         ws.onerror = (error) => {
           console.error('WebSocket ошибка:', error);
-          toast.error('Ошибка подключения к статусу контейнера');
+          isConnectingRef.current = false;
+          if (isMounted) {
+            toast.error('Ошибка подключения к статусу контейнера');
+          }
         };
 
         ws.onclose = () => {
           console.log('WebSocket закрыт');
-          // Пробуем переподключиться через 5 секунд
-          setTimeout(setupWebSocket, 5000);
+          isConnectingRef.current = false;
+          wsRef.current = null;
+
+          // Пробуем переподключиться только если компонент все еще смонтирован
+          if (isMounted && !reconnectTimeoutRef.current) {
+            reconnectTimeoutRef.current = setTimeout(() => {
+              reconnectTimeoutRef.current = undefined;
+              setupWebSocket();
+            }, 5000);
+          }
         };
 
       } catch (error) {
         console.error('Ошибка настройки WebSocket:', error);
-        toast.error('Не удалось подключиться к статусу контейнера');
+        isConnectingRef.current = false;
+        if (isMounted) {
+          toast.error('Не удалось подключиться к статусу контейнера');
+        }
       }
     };
 
     setupWebSocket();
 
     return () => {
-      if (ws) {
-        console.log('Закрытие WebSocket соединения');
-        ws.close();
+      isMounted = false;
+      debouncedStatusUpdate.cancel();
+      
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      
+      if (wsRef.current) {
+        console.log('Закрытие WebSocket соединения при размонтировании');
+        wsRef.current.close();
+        wsRef.current = null;
       }
     };
-  }, [containerId, onStatusUpdate]);
+  }, [containerId]);
 
   return null;
 };
