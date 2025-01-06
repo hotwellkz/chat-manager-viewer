@@ -88,6 +88,7 @@ export type Database = {
       }
       deployed_projects: {
         Row: {
+          container_logs: string | null
           created_at: string | null
           framework: string | null
           id: string
@@ -97,6 +98,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          container_logs?: string | null
           created_at?: string | null
           framework?: string | null
           id?: string
@@ -106,6 +108,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          container_logs?: string | null
           created_at?: string | null
           framework?: string | null
           id?: string
