@@ -18,7 +18,10 @@ export const ChatHistory = () => {
 
   useEffect(() => {
     fetchMessages();
-    setupRealtimeSubscription();
+    const channel = setupRealtimeSubscription();
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const fetchMessages = async () => {
@@ -26,16 +29,23 @@ export const ChatHistory = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      console.log('Загрузка сообщений для пользователя:', user.id);
+
       const { data, error } = await supabase
         .from('chat_history')
         .select('*')
         .eq('user_id', user.id)
         .order('timestamp', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Ошибка при загрузке сообщений:', error);
+        throw error;
+      }
+
+      console.log('Получено сообщений:', data?.length);
       setMessages(data || []);
     } catch (error) {
-      console.error('Error fetching messages:', error);
+      console.error('Ошибка при загрузке сообщений:', error);
       toast({
         title: "Ошибка",
         description: "Не удалось загрузить историю чата",
@@ -45,27 +55,28 @@ export const ChatHistory = () => {
   };
 
   const setupRealtimeSubscription = () => {
+    console.log('Настройка real-time подписки для чата');
+    
     const channel = supabase
       .channel('chat_updates')
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
           table: 'chat_history'
         },
         (payload) => {
-          console.log('Получено обновление чата:', payload);
-          if (payload.eventType === 'INSERT') {
-            setMessages(prev => [...prev, payload.new as ChatMessage]);
-          }
+          console.log('Получено новое сообщение:', payload);
+          const newMessage = payload.new as ChatMessage;
+          setMessages(prev => [...prev, newMessage]);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Статус подписки:', status);
+      });
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return channel;
   };
 
   const regenerateResponse = async (messageId: string) => {
