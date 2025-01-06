@@ -4,13 +4,48 @@ import { Button } from "./ui/button";
 import { Eye, RotateCcw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "./ui/use-toast";
+import { Badge } from "./ui/badge";
 
 interface ChatMessage {
   id: string;
   prompt: string;
   timestamp: string;
   is_ai: boolean;
+  status: 'pending' | 'processing' | 'completed' | 'error';
+  user_id?: string;
+  response?: string;
 }
+
+const isValidStatus = (status: string): status is ChatMessage['status'] => {
+  return ['pending', 'processing', 'completed', 'error'].includes(status);
+};
+
+const validateMessage = (message: any): ChatMessage => {
+  return {
+    id: message.id,
+    prompt: message.prompt,
+    timestamp: message.timestamp,
+    is_ai: message.is_ai,
+    status: isValidStatus(message.status) ? message.status : 'pending',
+    user_id: message.user_id,
+    response: message.response
+  };
+};
+
+const StatusBadge = ({ status }: { status: ChatMessage['status'] }) => {
+  const variants = {
+    pending: "bg-yellow-500",
+    processing: "bg-blue-500 animate-pulse",
+    completed: "bg-green-500",
+    error: "bg-red-500"
+  };
+
+  return (
+    <Badge className={`${variants[status]} text-xs`}>
+      {status}
+    </Badge>
+  );
+};
 
 export const ChatHistory = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -43,7 +78,7 @@ export const ChatHistory = () => {
       }
 
       console.log('Получено сообщений:', data?.length);
-      setMessages(data || []);
+      setMessages((data || []).map(validateMessage));
     } catch (error) {
       console.error('Ошибка при загрузке сообщений:', error);
       toast({
@@ -62,14 +97,19 @@ export const ChatHistory = () => {
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'chat_history'
         },
         (payload) => {
-          console.log('Получено новое сообщение:', payload);
-          const newMessage = payload.new as ChatMessage;
-          setMessages(prev => [...prev, newMessage]);
+          console.log('Получено обновление чата:', payload);
+          if (payload.eventType === 'INSERT') {
+            setMessages(prev => [...prev, validateMessage(payload.new)]);
+          } else if (payload.eventType === 'UPDATE') {
+            setMessages(prev => prev.map(msg => 
+              msg.id === payload.new.id ? validateMessage({ ...msg, ...payload.new }) : msg
+            ));
+          }
         }
       )
       .subscribe((status) => {
@@ -106,7 +146,10 @@ export const ChatHistory = () => {
                   : "bg-primary text-primary-foreground"
               }`}
             >
-              <p>{message.prompt}</p>
+              <div className="flex justify-between items-start mb-2">
+                <p>{message.prompt}</p>
+                <StatusBadge status={message.status} />
+              </div>
               <div className="text-xs mt-2 opacity-70">
                 {new Date(message.timestamp).toLocaleString()}
               </div>

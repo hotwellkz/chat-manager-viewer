@@ -15,6 +15,7 @@ export type Database = {
           is_ai: boolean | null
           prompt: string
           response: string | null
+          status: string | null
           timestamp: string | null
           user_id: string | null
         }
@@ -23,6 +24,7 @@ export type Database = {
           is_ai?: boolean | null
           prompt: string
           response?: string | null
+          status?: string | null
           timestamp?: string | null
           user_id?: string | null
         }
@@ -31,6 +33,7 @@ export type Database = {
           is_ai?: boolean | null
           prompt?: string
           response?: string | null
+          status?: string | null
           timestamp?: string | null
           user_id?: string | null
         }
