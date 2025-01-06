@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { FilesTable } from "@/integrations/supabase/types/tables";
 import { Editor } from "@monaco-editor/react";
@@ -16,17 +16,14 @@ export const PreviewFiles = ({
   selectedFileContent 
 }: PreviewFilesProps) => {
   const [files, setFiles] = useState<FilesTable['Row'][]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    if (showCode) {
-      fetchFiles();
-    }
-  }, [showCode]);
-
-  const fetchFiles = async () => {
+  const fetchFiles = useCallback(async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
+
+      setIsLoading(true);
 
       const { data, error } = await supabase
         .from('files')
@@ -48,10 +45,16 @@ export const PreviewFiles = ({
       }
     } catch (err) {
       console.error('Error in fetchFiles:', err);
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }, []);
 
-  if (!showCode) return null;
+  useEffect(() => {
+    if (showCode) {
+      fetchFiles();
+    }
+  }, [showCode, fetchFiles]);
 
   const getFileLanguage = (filePath: string | null) => {
     if (!filePath) return 'typescript';
@@ -60,6 +63,16 @@ export const PreviewFiles = ({
     if (filePath.endsWith('.json')) return 'json';
     return 'typescript';
   };
+
+  if (!showCode) return null;
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full text-muted-foreground">
+        Загрузка файлов...
+      </div>
+    );
+  }
 
   return (
     <div className="h-full">
