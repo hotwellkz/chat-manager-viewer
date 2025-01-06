@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 export const SaveToStorageButton = () => {
   const { toast } = useToast();
 
-  const handleSaveToStorage = async () => {
+  const handleSaveAndDeploy = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       
@@ -31,33 +31,13 @@ export const SaveToStorageButton = () => {
         return;
       }
 
-      console.log('Начало сохранения файлов:', {
+      console.log('Начало процесса деплоя:', {
         filesCount: files.length,
         userId: session.user.id
       });
 
-      // Сначала сохраняем файлы в Storage
-      for (const file of files) {
-        const filePath = `${session.user.id}/${file.name}`;
-        const fileContent = new TextEncoder().encode(file.content);
-
-        console.log(`Сохранение файла ${file.name} в Storage...`);
-        
-        const { error: uploadError } = await supabase.storage
-          .from('project_files')
-          .upload(filePath, fileContent, {
-            contentType: 'text/plain',
-            upsert: true
-          });
-
-        if (uploadError) {
-          console.error('Ошибка загрузки файла в Storage:', uploadError);
-          throw uploadError;
-        }
-      }
-
-      // Затем сохраняем метаданные в базу данных
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/files`, {
+      // Сразу запускаем процесс развертывания
+      const deployResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/deploy`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -69,51 +49,23 @@ export const SaveToStorageButton = () => {
           files: files.map(f => ({
             path: f.name,
             content: f.content
-          }))
+          })),
+          framework: 'react'
         }),
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.details || error.error || "Ошибка при сохранении файлов");
+      if (!deployResponse.ok) {
+        const deployError = await deployResponse.json();
+        throw new Error(deployError.details || deployError.error || "Ошибка при запуске развертывания");
       }
 
-      const result = await response.json();
+      const deployResult = await deployResponse.json();
 
-      if (result.success) {
+      if (deployResult.success) {
         toast({
-          title: "Успешно",
-          description: "Файлы сохранены",
+          title: "Развертывание запущено",
+          description: "Начинаем создание Docker контейнера",
         });
-
-        // Запускаем процесс развертывания
-        const deployResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/deploy`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${session.access_token}`,
-          },
-          credentials: 'include',
-          body: JSON.stringify({
-            userId: session.user.id,
-            files: result.files,
-            framework: 'react'
-          }),
-        });
-
-        if (!deployResponse.ok) {
-          const deployError = await deployResponse.json();
-          throw new Error(deployError.details || deployError.error || "Ошибка при запуске развертывания");
-        }
-
-        const deployResult = await deployResponse.json();
-
-        if (deployResult.success) {
-          toast({
-            title: "Развертывание запущено",
-            description: "Начинаем создание Docker контейнера",
-          });
-        }
       }
     } catch (error) {
       console.error("Error:", error);
@@ -129,7 +81,7 @@ export const SaveToStorageButton = () => {
     <Button 
       variant="ghost" 
       size="icon"
-      onClick={handleSaveToStorage}
+      onClick={handleSaveAndDeploy}
       title="Сохранить и развернуть"
     >
       <Save className="h-4 w-4" />

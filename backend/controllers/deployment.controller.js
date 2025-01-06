@@ -9,64 +9,24 @@ export const handleDeployment = async (req, res) => {
 
     console.log('Starting deployment process for user:', userId);
 
-    // Проверяем существующие проекты пользователя
-    const { data: existingProjects, error: fetchError } = await supabase
+    // Создаем новую запись о развертывании сразу
+    const { data: deployment, error: deploymentError } = await supabase
       .from('deployed_projects')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('status', 'preparing')
-      .order('created_at', { ascending: false })
-      .limit(1);
+      .insert({
+        user_id: userId,
+        framework: framework,
+        status: 'preparing',
+        container_logs: 'Создание нового проекта...'
+      })
+      .select()
+      .single();
 
-    if (fetchError) {
-      console.error('Error fetching existing projects:', fetchError);
-      throw fetchError;
+    if (deploymentError) {
+      console.error('Error creating deployment record:', deploymentError);
+      throw deploymentError;
     }
 
-    let deployment;
-
-    if (existingProjects && existingProjects.length > 0) {
-      // Обновляем существующий проект
-      const { data: updatedDeployment, error: updateError } = await supabase
-        .from('deployed_projects')
-        .update({
-          framework: framework,
-          status: 'preparing',
-          last_deployment: new Date().toISOString(),
-          container_logs: 'Инициализация процесса сборки...'
-        })
-        .eq('id', existingProjects[0].id)
-        .select()
-        .single();
-
-      if (updateError) {
-        console.error('Error updating existing deployment:', updateError);
-        throw updateError;
-      }
-
-      deployment = updatedDeployment;
-      console.log('Updated existing deployment:', deployment.id);
-    } else {
-      // Создаем новую запись о развертывании
-      const { data: newDeployment, error: deploymentError } = await supabase
-        .from('deployed_projects')
-        .insert({
-          user_id: userId,
-          framework: framework,
-          status: 'preparing',
-          container_logs: 'Создание нового проекта...'
-        })
-        .select()
-        .single();
-
-      if (deploymentError) {
-        console.error('Error creating deployment record:', deploymentError);
-        throw deploymentError;
-      }
-
-      deployment = newDeployment;
-      console.log('Created new deployment record:', deployment.id);
-    }
+    console.log('Created new deployment record:', deployment.id);
 
     // Устанавливаем таймаут для всего процесса
     timeoutId = setTimeout(async () => {
@@ -87,7 +47,7 @@ export const handleDeployment = async (req, res) => {
     }, BUILD_TIMEOUT);
 
     try {
-      // Создаем и запускаем Docker контейнер
+      // Сразу запускаем создание и старт контейнера
       const containerResult = await createAndStartContainer(
         userId,
         deployment.id,
@@ -95,7 +55,6 @@ export const handleDeployment = async (req, res) => {
         files
       );
 
-      // Получаем URL для демонстрации (используем новый домен)
       const deploymentUrl = `https://docker-jy4o.onrender.com/container/${deployment.id}`;
 
       // Обновляем финальный статус
@@ -114,7 +73,6 @@ export const handleDeployment = async (req, res) => {
         throw finalUpdateError;
       }
 
-      // Очищаем таймаут
       clearTimeout(timeoutId);
 
       console.log('Deployment completed successfully:', deploymentUrl);
@@ -129,7 +87,6 @@ export const handleDeployment = async (req, res) => {
     } catch (error) {
       console.error('Error during container operations:', error);
       
-      // Обновляем статус на ошибку
       await supabase
         .from('deployed_projects')
         .update({ 
