@@ -20,15 +20,14 @@ export const PromptInput = () => {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Новая функция автоматического сохранения после получения ответа
-  const handleAutoSaveAfterPrompt = async (files: any[], userId: string, token: string) => {
+  const handleDeployAfterPrompt = async (files: any[], userId: string, token: string) => {
     try {
-      console.log('Автоматическое сохранение после получения ответа:', {
+      console.log('Запуск деплоя после получения ответа:', {
         filesCount: files.length,
         userId
       });
 
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/files`, {
+      const deployResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/deploy`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -40,52 +39,28 @@ export const PromptInput = () => {
           files: files.map(f => ({
             path: f.name || f.path,
             content: f.content
-          }))
+          })),
+          framework
         }),
       });
 
-      if (!response.ok) {
-        throw new Error("Ошибка при сохранении файлов");
+      if (!deployResponse.ok) {
+        throw new Error("Ошибка при запуске развертывания");
       }
 
-      const result = await response.json();
+      const deployResult = await deployResponse.json();
       
-      if (result.success) {
-        console.log('Файлы успешно сохранены после получения ответа');
-        
-        // Автоматически запускаем развертывание
-        const deployResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/deploy`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
-          },
-          credentials: 'include',
-          body: JSON.stringify({
-            userId,
-            files: result.files,
-            framework
-          }),
+      if (deployResult.success) {
+        toast({
+          title: "Успешно",
+          description: "Начато развертывание проекта",
         });
-
-        if (!deployResponse.ok) {
-          throw new Error("Ошибка при запуске развертывания");
-        }
-
-        const deployResult = await deployResponse.json();
-        
-        if (deployResult.success) {
-          toast({
-            title: "Успешно",
-            description: "Файлы сохранены и начато развертывание",
-          });
-        }
       }
     } catch (error) {
-      console.error("Error during auto-save after prompt:", error);
+      console.error("Error during deployment:", error);
       toast({
         title: "Ошибка",
-        description: error.message || "Произошла ошибка при автоматическом сохранении",
+        description: error.message || "Произошла ошибка при развертывании",
         variant: "destructive",
       });
     }
@@ -155,9 +130,9 @@ export const PromptInput = () => {
         throw new Error("Неуспешный ответ от сервера");
       }
 
-      // Автоматически сохраняем файлы после получения ответа
+      // Сразу запускаем деплой после получения файлов
       if (data.files && data.files.length > 0) {
-        await handleAutoSaveAfterPrompt(data.files, user.id, session.access_token);
+        await handleDeployAfterPrompt(data.files, user.id, session.access_token);
       }
 
       toast({
