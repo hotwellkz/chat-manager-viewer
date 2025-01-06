@@ -1,17 +1,10 @@
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Card } from "@/components/ui/card";
-import { BuildControls } from "./BuildControls";
-import { DeploymentLink } from "./DeploymentLink";
 import { DeploymentProgress } from "./DeploymentProgress";
 import { DeploymentSteps } from "./DeploymentSteps";
-
-interface BuildMetadata {
-  version: string;
-  containerId: string;
-  lastModified: string;
-}
+import { PlayCircle, Loader2 } from "lucide-react";
+import { Button } from "../ui/button";
 
 const STAGES = {
   idle: { progress: 0, message: 'Готов к сборке' },
@@ -28,24 +21,9 @@ type BuildStage = keyof typeof STAGES;
 export const DockerBuildManager = () => {
   const [isBuilding, setIsBuilding] = useState(false);
   const [buildStage, setBuildStage] = useState<BuildStage>('idle');
-  const [metadata, setMetadata] = useState<BuildMetadata | null>(null);
   const [deployedUrl, setDeployedUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
-
-  const getDeploymentSteps = () => {
-    const stages: BuildStage[] = ['preparing', 'packaging', 'building', 'deploying'];
-    return stages.map(stage => ({
-      label: STAGES[stage].message,
-      status: buildStage === stage 
-        ? 'in-progress' as const
-        : stages.indexOf(stage) < stages.indexOf(buildStage as BuildStage)
-          ? 'completed' as const
-          : buildStage === 'error'
-            ? 'error' as const
-            : 'pending' as const
-    }));
-  };
 
   const handleBuild = async () => {
     try {
@@ -53,104 +31,97 @@ export const DockerBuildManager = () => {
       setError(null);
       setBuildStage('preparing');
       
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { session } } = await supabase.auth.getSession();
       
-      if (!user) {
+      if (!session) {
         throw new Error('Пользователь не авторизован');
       }
 
-      setBuildStage('packaging');
-      const response = await supabase.functions.invoke('prepare-deployment', {
-        body: { userId: user.id }
-      });
-
-      if (!response.data?.success) {
-        throw new Error(response.data?.error || 'Ошибка при подготовке деплоя');
+      // Получаем список файлов из localStorage
+      const files = JSON.parse(localStorage.getItem('editorFiles') || '[]');
+      
+      if (!files.length) {
+        throw new Error('Нет файлов для сборки');
       }
 
-      setMetadata(response.data.metadata);
-      setBuildStage('building');
-      
-      toast({
-        title: "Сборка запущена",
-        description: "Началась сборка Docker образа",
+      console.log('Начинаем сборку:', {
+        filesCount: files.length,
+        userId: session.user.id
       });
 
-      // Проверяем статус сборки каждые 5 секунд
-      const checkBuildStatus = setInterval(async () => {
-        const { data: deployData, error: deployError } = await supabase
-          .from('deployed_projects')
-          .select('status, project_url')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
+      // Запускаем процесс сборки
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/deploy`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          userId: session.user.id,
+          files: files.map(f => ({
+            path: f.name,
+            content: f.content
+          })),
+          framework: 'react'
+        }),
+      });
 
-        if (deployError) {
-          clearInterval(checkBuildStatus);
-          throw deployError;
-        }
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.details || error.error || "Ошибка при запуске сборки");
+      }
 
-        switch (deployData.status) {
-          case 'packaging':
-            setBuildStage('packaging');
-            break;
-          case 'building':
-            setBuildStage('building');
-            break;
-          case 'deploying':
-            setBuildStage('deploying');
-            break;
-          case 'deployed':
-            clearInterval(checkBuildStatus);
-            setBuildStage('completed');
-            setDeployedUrl(deployData.project_url);
-            setIsBuilding(false);
-            toast({
-              title: "Готово",
-              description: `Docker образ успешно собран и развернут`,
-            });
-            break;
-          case 'error':
-            clearInterval(checkBuildStatus);
-            throw new Error('Ошибка при сборке образа');
-        }
-      }, 5000);
+      const result = await response.json();
 
+      if (result.success) {
+        setBuildStage('completed');
+        setDeployedUrl(result.deploymentUrl);
+        toast({
+          title: "Успешно",
+          description: "Сборка завершена успешно",
+        });
+      }
     } catch (error) {
       console.error('Build error:', error);
       setBuildStage('error');
       setError(error.message);
-      setIsBuilding(false);
       toast({
         variant: "destructive",
         title: "Ошибка",
-        description: "Не удалось запустить сборку Docker образа",
+        description: error.message || "Не удалось запустить сборку",
       });
+    } finally {
+      setIsBuilding(false);
     }
   };
 
   return (
-    <Card className="p-4 space-y-6">
-      <div className="flex items-center justify-between">
-        <BuildControls 
-          isBuilding={isBuilding}
-          onBuild={handleBuild}
-          metadata={metadata}
-        />
-        <DeploymentLink url={deployedUrl} />
+    <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 flex-1">
+        <Button
+          onClick={handleBuild}
+          disabled={isBuilding}
+          variant="ghost"
+          className="h-8"
+        >
+          {isBuilding ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <PlayCircle className="h-4 w-4 mr-2" />
+          )}
+          {isBuilding ? 'Сборка...' : 'Запустить сборку'}
+        </Button>
+        <span className="text-sm text-muted-foreground">
+          {STAGES[buildStage].message}
+        </span>
       </div>
       
-      <DeploymentProgress 
-        stage={buildStage}
-        message={STAGES[buildStage].message}
-        progress={STAGES[buildStage].progress}
-        error={error}
-      />
-
-      {isBuilding && (
-        <DeploymentSteps steps={getDeploymentSteps()} />
+      {error && (
+        <span className="text-sm text-destructive">
+          {error}
+        </span>
       )}
-    </Card>
+    </div>
   );
 };
