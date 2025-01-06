@@ -50,12 +50,15 @@ export const ChatHistory = () => {
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'chat_history'
         },
         (payload) => {
-          setMessages(prev => [...prev, payload.new as ChatMessage]);
+          console.log('Получено обновление чата:', payload);
+          if (payload.eventType === 'INSERT') {
+            setMessages(prev => [...prev, payload.new as ChatMessage]);
+          }
         }
       )
       .subscribe();

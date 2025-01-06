@@ -19,6 +19,7 @@ export const FileManager = () => {
 
   useEffect(() => {
     fetchFiles();
+    setupRealtimeSubscription();
   }, []);
 
   const fetchFiles = async () => {
@@ -43,6 +44,28 @@ export const FileManager = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const setupRealtimeSubscription = () => {
+    const channel = supabase
+      .channel('files_updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'files'
+        },
+        async (payload) => {
+          console.log('Получено обновление файлов:', payload);
+          await fetchFiles(); // Перезагружаем все файлы для обновления дерева
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   };
 
   const buildFileTree = (files: any[]): FileNode[] => {
