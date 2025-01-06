@@ -45,8 +45,7 @@ export const PromptInput = () => {
       });
 
       if (!deployResponse.ok) {
-        const errorData = await deployResponse.json();
-        throw new Error(errorData.error || "Ошибка при запуске развертывания");
+        throw new Error("Ошибка при запуске развертывания");
       }
 
       const deployResult = await deployResponse.json();
@@ -82,16 +81,10 @@ export const PromptInput = () => {
     setError(null);
     
     try {
-      console.log('Начало обработки запроса');
-      
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
-        console.error('Ошибка получения сессии:', sessionError);
-        throw new Error("Ошибка авторизации");
-      }
+      if (sessionError) throw new Error("Ошибка авторизации");
       
       if (!session) {
-        console.error('Сессия отсутствует');
         toast({
           title: "Ошибка",
           description: "Необходима авторизация",
@@ -101,13 +94,9 @@ export const PromptInput = () => {
       }
 
       const { data: { user }, error: userError } = await supabase.auth.getUser();
-      if (userError) {
-        console.error('Ошибка получения данных пользователя:', userError);
-        throw new Error("Ошибка получения данных пользователя");
-      }
+      if (userError) throw new Error("Ошибка получения данных пользователя");
 
       if (!user) {
-        console.error('Пользователь не найден');
         toast({
           title: "Ошибка",
           description: "Пользователь не найден",
@@ -115,12 +104,6 @@ export const PromptInput = () => {
         });
         return;
       }
-
-      console.log('Отправка запроса на сервер:', {
-        prompt,
-        userId: user.id,
-        framework
-      });
 
       const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/prompt`, {
         method: "POST",
@@ -138,12 +121,10 @@ export const PromptInput = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('Ошибка от сервера:', errorData);
         throw new Error(errorData.error || "Ошибка при обработке запроса");
       }
       
       const data = await response.json();
-      console.log('Получен ответ от сервера:', data);
       
       if (!data.success) {
         throw new Error("Неуспешный ответ от сервера");
