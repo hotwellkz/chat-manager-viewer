@@ -62,79 +62,35 @@ export const BuildControls = ({ isBuilding, onBuild, metadata }: BuildControlsPr
       const packageJson = files.find(f => f.file_path.includes('package.json'));
       const framework = packageJson?.content?.includes('react') ? 'react' : 'node';
 
-      // Проверяем существующие проекты пользователя
-      const { data: existingProjects, error: projectError } = await supabase
-        .from('deployed_projects')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('status', 'preparing')
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (projectError) {
-        console.error('Error checking existing projects:', projectError);
-        throw new Error('Ошибка при проверке существующих проектов');
-      }
-
-      let projectId;
-
-      if (existingProjects && existingProjects.length > 0) {
-        // Обновляем существующий проект
-        const { data: updatedProject, error: updateError } = await supabase
-          .from('deployed_projects')
-          .update({
-            framework: framework,
-            status: 'preparing',
-            last_deployment: new Date().toISOString()
-          })
-          .eq('id', existingProjects[0].id)
-          .select()
-          .single();
-
-        if (updateError) {
-          console.error('Error updating project:', updateError);
-          throw new Error('Ошибка при обновлении проекта');
-        }
-
-        projectId = updatedProject.id;
-        console.log('Updated existing project:', projectId);
-      } else {
-        // Создаем новый проект
-        const { data: newProject, error: createError } = await supabase
-          .from('deployed_projects')
-          .insert({
-            user_id: user.id,
-            framework: framework,
-            status: 'preparing'
-          })
-          .select()
-          .single();
-
-        if (createError) {
-          console.error('Error creating project:', createError);
-          throw new Error('Ошибка при создании проекта');
-        }
-
-        projectId = newProject.id;
-        console.log('Created new project:', projectId);
-      }
-
-      // Запускаем процесс подготовки к развертыванию
-      const { data: prepData, error: prepError } = await supabase.functions.invoke('prepare-deployment', {
-        body: { userId: user.id }
+      // Запускаем процесс развертывания
+      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/deploy`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          userId: user.id,
+          files: files,
+          framework: framework
+        }),
       });
 
-      if (prepError || !prepData?.success) {
-        console.error('Preparation error:', prepError || prepData?.error);
-        throw new Error(prepData?.error || 'Ошибка при подготовке деплоя');
+      if (!response.ok) {
+        throw new Error("Ошибка при запуске развертывания");
       }
 
-      toast({
-        title: "Успешно",
-        description: "Начато развертывание проекта",
-      });
-      
-      onBuild();
+      const result = await response.json();
+
+      if (result.success) {
+        toast({
+          title: "Успешно",
+          description: "Начато развертывание проекта",
+        });
+        
+        onBuild();
+      }
 
     } catch (error) {
       console.error('Build error:', error);
