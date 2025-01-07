@@ -46,25 +46,48 @@ serve(async (req) => {
     // Создаем ZIP архив
     const zip = new JSZip()
 
-    // Добавляем файлы в архив, используя только имя файла
+    // Добавляем файлы в архив
     for (const file of files) {
-      // Получаем только имя файла из полного пути
-      const fileName = file.filename || file.file_path.split('/').pop()
-      console.log(`Adding file to ZIP: ${fileName}`)
-      
-      if (file.content) {
-        zip.file(fileName, file.content)
-      } else {
-        console.warn(`File ${fileName} has no content`)
+      try {
+        // Получаем только имя файла из полного пути
+        const fileName = file.filename || file.file_path.split('/').pop()
+        
+        if (!fileName) {
+          console.warn('File name is missing:', file)
+          continue
+        }
+
+        console.log(`Processing file for ZIP: ${fileName}`)
+        
+        if (!file.content) {
+          console.warn(`File ${fileName} has no content`)
+          continue
+        }
+
+        // Используем TextEncoder для конвертации текста в бинарные данные
+        const encoder = new TextEncoder()
+        const fileContent = encoder.encode(file.content)
+        
+        console.log(`Adding file to ZIP: ${fileName}, content length: ${fileContent.length} bytes`)
+        
+        zip.file(fileName, fileContent)
+        
+      } catch (fileError) {
+        console.error(`Error processing file ${file.filename}:`, fileError)
       }
     }
 
+    console.log('Generating ZIP file...')
+
     // Генерируем ZIP файл
     const zipContent = await zip.generateAsync({ type: "uint8array" })
+    console.log('ZIP file generated, size:', zipContent.length, 'bytes')
 
     // Генерируем уникальное имя для ZIP файла
     const timestamp = new Date().toISOString()
     const zipFileName = `${userId}/packages/${timestamp}/project.zip`
+
+    console.log('Uploading ZIP file to storage:', zipFileName)
 
     // Сохраняем ZIP в storage
     const { error: uploadError } = await supabase.storage
