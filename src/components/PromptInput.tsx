@@ -4,6 +4,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Send } from "lucide-react";
+import { saveFilesToDatabase } from "@/utils/fileStorage";
 import {
   Select,
   SelectContent,
@@ -22,11 +23,16 @@ export const PromptInput = () => {
 
   const handleDeployAfterPrompt = async (files: any[], userId: string, token: string) => {
     try {
-      console.log('Запуск деплоя после получения ответа:', {
+      console.log('Начало процесса деплоя:', {
         filesCount: files.length,
         userId
       });
 
+      // Сначала сохраняем файлы
+      const savedFiles = await saveFilesToDatabase(files, userId);
+      console.log('Файлы успешно сохранены:', savedFiles);
+
+      // Теперь запускаем деплой
       const deployResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/deploy`, {
         method: "POST",
         headers: {
@@ -36,8 +42,8 @@ export const PromptInput = () => {
         credentials: 'include',
         body: JSON.stringify({
           userId,
-          files: files.map(f => ({
-            path: f.name || f.path,
+          files: savedFiles.map(f => ({
+            path: f.file_path.split('/').pop() || f.filename,
             content: f.content
           })),
           framework
@@ -52,15 +58,15 @@ export const PromptInput = () => {
       
       if (deployResult.success) {
         toast({
-          title: "Успешно",
-          description: "Начато развертывание проекта",
+          title: "Успешно!",
+          description: "Начинаем создание приложения",
         });
       }
     } catch (error) {
-      console.error("Error during deployment:", error);
+      console.error("Error:", error);
       toast({
         title: "Ошибка",
-        description: error.message || "Произошла ошибка при развертывании",
+        description: error.message || "Произошла ошибка при обработке запроса",
         variant: "destructive",
       });
     }
@@ -130,7 +136,7 @@ export const PromptInput = () => {
         throw new Error("Неуспешный ответ от сервера");
       }
 
-      // Сразу запускаем деплой после получения файлов
+      // Сначала сохраняем файлы, потом запускаем деплой
       if (data.files && data.files.length > 0) {
         await handleDeployAfterPrompt(data.files, user.id, session.access_token);
       }

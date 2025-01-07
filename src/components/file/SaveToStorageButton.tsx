@@ -2,6 +2,7 @@ import { Save } from "lucide-react";
 import { Button } from "../ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { saveFilesToDatabase } from "@/utils/fileStorage";
 
 export const SaveToStorageButton = () => {
   const { toast } = useToast();
@@ -31,12 +32,16 @@ export const SaveToStorageButton = () => {
         return;
       }
 
-      console.log('Начало процесса деплоя:', {
+      console.log('Начало процесса сохранения и деплоя:', {
         filesCount: files.length,
         userId: session.user.id
       });
 
-      // Сразу запускаем процесс развертывания
+      // Сначала сохраняем файлы в базу данных
+      const savedFiles = await saveFilesToDatabase(files, session.user.id);
+      console.log('Файлы успешно сохранены:', savedFiles);
+
+      // Теперь запускаем процесс развертывания
       const deployResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/deploy`, {
         method: "POST",
         headers: {
@@ -46,8 +51,8 @@ export const SaveToStorageButton = () => {
         credentials: 'include',
         body: JSON.stringify({
           userId: session.user.id,
-          files: files.map(f => ({
-            path: f.name,
+          files: savedFiles.map(f => ({
+            path: f.file_path.split('/').pop() || f.filename,
             content: f.content
           })),
           framework: 'react'
