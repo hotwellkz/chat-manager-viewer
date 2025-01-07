@@ -48,15 +48,20 @@ export const DockerBuildManager = () => {
         throw new Error('Ошибка при получении файлов');
       }
 
-      // Проверяем наличие файлов
       if (!supabaseFiles || supabaseFiles.length === 0) {
         throw new Error('Нет файлов для сборки. Создайте хотя бы один файл.');
       }
 
       console.log('Starting build with files:', {
         filesCount: supabaseFiles.length,
-        userId: session.user.id
+        userId: session.user.id,
+        files: supabaseFiles.map(f => ({
+          path: f.file_path,
+          content: f.content
+        }))
       });
+
+      setBuildStage('packaging');
 
       // Запускаем процесс сборки с файлами из Supabase
       const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/deploy`, {
@@ -69,7 +74,7 @@ export const DockerBuildManager = () => {
         body: JSON.stringify({
           userId: session.user.id,
           files: supabaseFiles.map(f => ({
-            path: f.file_path.split('/').pop() || f.filename,
+            path: f.file_path,
             content: f.content
           })),
           framework: 'react'
@@ -77,8 +82,8 @@ export const DockerBuildManager = () => {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.details || error.error || "Ошибка при запуске сборки");
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Ошибка при запуске сборки");
       }
 
       const result = await response.json();
@@ -90,6 +95,8 @@ export const DockerBuildManager = () => {
           title: "Успешно",
           description: "Сборка запущена успешно",
         });
+      } else {
+        throw new Error(result.error || "Неизвестная ошибка при сборке");
       }
     } catch (error) {
       console.error('Build error:', error);

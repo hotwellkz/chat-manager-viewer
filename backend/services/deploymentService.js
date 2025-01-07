@@ -10,8 +10,21 @@ export const deployFiles = async (userId, files, framework) => {
   try {
     console.log('Начало развертывания файлов:', {
       userId,
-      filesCount: files.length,
-      framework
+      filesCount: files?.length,
+      framework,
+      files: files.map(f => ({ path: f.path }))
+    });
+
+    if (!files || !Array.isArray(files) || files.length === 0) {
+      throw new Error('Файлы для развертывания не предоставлены');
+    }
+
+    // Проверяем каждый файл
+    files.forEach((file, index) => {
+      if (!file || typeof file.path !== 'string' || typeof file.content !== 'string') {
+        console.error('Некорректный файл:', { index, file });
+        throw new Error(`Некорректные данные файла ${index}: ${file?.path || 'путь не указан'}`);
+      }
     });
 
     // Создаем директорию для проекта
@@ -23,6 +36,12 @@ export const deployFiles = async (userId, files, framework) => {
       const filePath = path.join(projectDir, file.path);
       const dirPath = path.dirname(filePath);
       
+      console.log('Сохранение файла:', {
+        path: file.path,
+        dirPath,
+        filePath
+      });
+
       // Создаем поддиректории если нужно
       await fs.mkdir(dirPath, { recursive: true });
       
@@ -48,7 +67,10 @@ export const deployFiles = async (userId, files, framework) => {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Ошибка при обновлении статуса развертывания:', error);
+      throw error;
+    }
 
     console.log('Развертывание завершено успешно:', {
       deploymentUrl,

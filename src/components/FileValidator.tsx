@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, memo } from "react";
 import { AlertCircle, CheckCircle2, FileWarning, Shield, Code, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from "./ui/alert";
@@ -17,62 +17,61 @@ interface FileValidatorProps {
   onValidationComplete: (isValid: boolean) => void;
 }
 
-export const FileValidator = ({ file, onValidationComplete }: FileValidatorProps) => {
-  const [isValid, setIsValid] = useState<boolean>(false);
-  const [errors, setErrors] = useState<string[]>([]);
-  const [warnings, setWarnings] = useState<string[]>([]);
-  const [details, setDetails] = useState<{
-    syntaxValid: boolean;
-    structureValid: boolean;
-    securityValid: boolean;
-    sizeValid: boolean;
-  }>({
-    syntaxValid: false,
-    structureValid: false,
-    securityValid: false,
-    sizeValid: false
+export const FileValidator = memo(({ file, onValidationComplete }: FileValidatorProps) => {
+  const [validationState, setValidationState] = useState({
+    isValid: false,
+    errors: [] as string[],
+    warnings: [] as string[],
+    details: {
+      syntaxValid: false,
+      structureValid: false,
+      securityValid: false,
+      sizeValid: false
+    }
   });
   const [validationProgress, setValidationProgress] = useState(0);
   const { toast } = useToast();
 
-  useEffect(() => {
-    const runValidation = async () => {
-      setValidationProgress(0);
-      
-      // Имитируем процесс валидации для лучшего UX
-      const steps = [25, 50, 75, 100];
-      for (const progress of steps) {
-        await new Promise(resolve => setTimeout(resolve, 200));
-        setValidationProgress(progress);
-      }
+  const runValidation = useCallback(async () => {
+    setValidationProgress(0);
+    
+    const steps = [25, 50, 75, 100];
+    for (const progress of steps) {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      setValidationProgress(progress);
+    }
 
-      const result = validateFile(file);
-      
-      setIsValid(result.isValid);
-      setErrors(result.errors);
-      setWarnings(result.warnings);
-      setDetails(result.details);
-      onValidationComplete(result.isValid);
+    const result = validateFile(file);
+    
+    setValidationState({
+      isValid: result.isValid,
+      errors: result.errors,
+      warnings: result.warnings,
+      details: result.details
+    });
+    
+    onValidationComplete(result.isValid);
 
-      if (result.errors.length > 0) {
-        toast({
-          variant: "destructive",
-          title: "Ошибки валидации",
-          description: `Найдено ${result.errors.length} проблем`,
-        });
-      }
+    if (result.errors.length > 0) {
+      toast({
+        variant: "destructive",
+        title: "Ошибки валидации",
+        description: `Найдено ${result.errors.length} проблем`,
+      });
+    }
 
-      if (result.warnings.length > 0) {
-        toast({
-          variant: "default",
-          title: "Предупреждения",
-          description: `Найдено ${result.warnings.length} предупреждений`,
-        });
-      }
-    };
-
-    runValidation();
+    if (result.warnings.length > 0) {
+      toast({
+        variant: "default",
+        title: "Предупреждения",
+        description: `Найдено ${result.warnings.length} предупреждений`,
+      });
+    }
   }, [file, onValidationComplete, toast]);
+
+  useEffect(() => {
+    runValidation();
+  }, [runValidation]);
 
   const getValidationColor = (isValid: boolean) => 
     isValid ? "text-green-500" : "text-red-500";
@@ -81,7 +80,7 @@ export const FileValidator = ({ file, onValidationComplete }: FileValidatorProps
     <Card className="space-y-4 p-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {isValid ? (
+          {validationState.isValid ? (
             <CheckCircle2 className="h-5 w-5 text-green-500" />
           ) : (
             <FileWarning className="h-5 w-5 text-yellow-500" />
@@ -106,34 +105,34 @@ export const FileValidator = ({ file, onValidationComplete }: FileValidatorProps
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="flex items-center gap-2">
-              <Code className={getValidationColor(details.syntaxValid)} />
+              <Code className={getValidationColor(validationState.details.syntaxValid)} />
               <span>Синтаксис</span>
-              <Badge variant={details.syntaxValid ? "default" : "destructive"}>
-                {details.syntaxValid ? "OK" : "Ошибка"}
+              <Badge variant={validationState.details.syntaxValid ? "default" : "destructive"}>
+                {validationState.details.syntaxValid ? "OK" : "Ошибка"}
               </Badge>
             </div>
             <div className="flex items-center gap-2">
-              <FileText className={getValidationColor(details.structureValid)} />
+              <FileText className={getValidationColor(validationState.details.structureValid)} />
               <span>Структура</span>
-              <Badge variant={details.structureValid ? "default" : "destructive"}>
-                {details.structureValid ? "OK" : "Ошибка"}
+              <Badge variant={validationState.details.structureValid ? "default" : "destructive"}>
+                {validationState.details.structureValid ? "OK" : "Ошибка"}
               </Badge>
             </div>
             <div className="flex items-center gap-2">
-              <Shield className={getValidationColor(details.securityValid)} />
+              <Shield className={getValidationColor(validationState.details.securityValid)} />
               <span>Безопасность</span>
-              <Badge variant={details.securityValid ? "default" : "destructive"}>
-                {details.securityValid ? "OK" : "Внимание"}
+              <Badge variant={validationState.details.securityValid ? "default" : "destructive"}>
+                {validationState.details.securityValid ? "OK" : "Внимание"}
               </Badge>
             </div>
           </div>
 
-          {errors.length > 0 && (
+          {validationState.errors.length > 0 && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
                 <ul className="list-disc pl-4 space-y-1">
-                  {errors.map((error, index) => (
+                  {validationState.errors.map((error, index) => (
                     <li key={index} className="text-sm">
                       {error}
                     </li>
@@ -143,12 +142,12 @@ export const FileValidator = ({ file, onValidationComplete }: FileValidatorProps
             </Alert>
           )}
 
-          {warnings.length > 0 && (
+          {validationState.warnings.length > 0 && (
             <Alert variant="default">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
                 <ul className="list-disc pl-4 space-y-1">
-                  {warnings.map((warning, index) => (
+                  {validationState.warnings.map((warning, index) => (
                     <li key={index} className="text-sm">
                       {warning}
                     </li>
@@ -161,4 +160,6 @@ export const FileValidator = ({ file, onValidationComplete }: FileValidatorProps
       )}
     </Card>
   );
-};
+});
+
+FileValidator.displayName = 'FileValidator';
