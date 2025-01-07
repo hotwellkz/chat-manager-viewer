@@ -3,16 +3,16 @@ import { supabase } from '../config/supabase.js';
 
 export const handleDeployment = async (req, res) => {
   try {
-    const { userId, files, framework } = req.body;
+    const { userId, files, framework, platform } = req.body;
 
     console.log('Получены данные для развертывания:', {
       userId,
       filesCount: files?.length,
       framework,
+      platform,
       files: files?.map(f => ({ path: f.path }))
     });
 
-    // Улучшенная валидация входных данных
     if (!userId) {
       console.error('Отсутствует userId');
       return res.status(400).json({
@@ -26,14 +26,6 @@ export const handleDeployment = async (req, res) => {
       return res.status(400).json({
         success: false,
         error: 'Необходимо предоставить хотя бы один файл'
-      });
-    }
-
-    if (!framework) {
-      console.error('Не указан фреймворк');
-      return res.status(400).json({
-        success: false,
-        error: 'Необходимо указать фреймворк'
       });
     }
 
@@ -52,10 +44,31 @@ export const handleDeployment = async (req, res) => {
       });
     }
 
-    // Разворачиваем файлы
-    const result = await deployFiles(userId, files, framework);
-    console.log('Результат развертывания:', result);
+    let result;
+    
+    if (platform === 'vercel') {
+      // Вызываем Edge Function для деплоя на Vercel
+      const response = await fetch(`${process.env.SUPABASE_URL}/functions/v1/vercel-deploy`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
+        },
+        body: JSON.stringify({ userId, files, platform })
+      });
 
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Ошибка при деплое на Vercel');
+      }
+
+      result = await response.json();
+    } else {
+      // Стандартный деплой
+      result = await deployFiles(userId, files, framework);
+    }
+
+    console.log('Результат развертывания:', result);
     res.json(result);
 
   } catch (error) {
