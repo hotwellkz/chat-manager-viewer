@@ -46,7 +46,7 @@ export const DeployButton = () => {
 
       // Определяем фреймворк на основе package.json или используем react по умолчанию
       let framework = 'react';
-      const packageJson = files.find(f => f.file_path.includes('package.json'));
+      const packageJson = files.find(f => f.filename === 'package.json');
       if (packageJson?.content) {
         try {
           const pkg = JSON.parse(packageJson.content);
@@ -60,10 +60,12 @@ export const DeployButton = () => {
       console.log('Deploying with framework:', framework);
 
       // Форматируем файлы для отправки
-      const formattedFiles = files.map(f => ({
-        path: f.filename, // Используем filename вместо file_path
-        content: f.content || '' // Убеждаемся, что content не undefined
-      })).filter(f => f.content && f.path); // Фильтруем файлы без контента или пути
+      const formattedFiles = files
+        .filter(f => f.content && f.filename) // Фильтруем файлы без контента или имени
+        .map(f => ({
+          path: f.filename, // Используем filename вместо file_path
+          content: f.content || '' // Убеждаемся, что content не undefined
+        }));
 
       // Отправляем запрос на деплой
       const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/deploy`, {
