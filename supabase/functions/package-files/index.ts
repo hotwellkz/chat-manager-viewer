@@ -46,9 +46,17 @@ serve(async (req) => {
     // Создаем ZIP архив
     const zip = new JSZip()
 
-    // Добавляем файлы в архив
+    // Добавляем файлы в архив, используя только имя файла
     for (const file of files) {
-      zip.file(file.file_path, file.content)
+      // Получаем только имя файла из полного пути
+      const fileName = file.filename || file.file_path.split('/').pop()
+      console.log(`Adding file to ZIP: ${fileName}`)
+      
+      if (file.content) {
+        zip.file(fileName, file.content)
+      } else {
+        console.warn(`File ${fileName} has no content`)
+      }
     }
 
     // Генерируем ZIP файл
