@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Loader2, PlayCircle } from "lucide-react";
+import { Loader2, Rocket } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -130,7 +130,7 @@ export const BuildControls = ({ isBuilding, onBuild, metadata }: BuildControlsPr
               {isBuilding ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <PlayCircle className="h-4 w-4" />
+                <Rocket className="h-4 w-4" />
               )}
             </Button>
           </TooltipTrigger>
