@@ -31,7 +31,9 @@ export const DeployButton = () => {
       const { data: files, error: filesError } = await supabase
         .from('files')
         .select('*')
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .not('filename', 'is', null) // Добавляем фильтр для исключения записей с null filename
+        .not('content', 'is', null); // Добавляем фильтр для исключения записей с null content
 
       if (filesError) {
         console.error('Error fetching files:', filesError);
@@ -42,7 +44,13 @@ export const DeployButton = () => {
         throw new Error("Нет файлов для деплоя. Создайте хотя бы один файл.");
       }
 
-      console.log('Files ready for deployment:', files.length);
+      console.log('Files ready for deployment:', {
+        count: files.length,
+        files: files.map(f => ({ 
+          filename: f.filename,
+          hasContent: Boolean(f.content)
+        }))
+      });
 
       // Определяем фреймворк на основе package.json или используем react по умолчанию
       let framework = 'react';
@@ -63,9 +71,18 @@ export const DeployButton = () => {
       const formattedFiles = files
         .filter(f => f.content && f.filename) // Фильтруем файлы без контента или имени
         .map(f => ({
-          path: f.filename, // Используем filename вместо file_path
-          content: f.content || '' // Убеждаемся, что content не undefined
+          path: f.filename,
+          content: f.content
         }));
+
+      console.log('Formatted files for deployment:', {
+        count: formattedFiles.length,
+        files: formattedFiles.map(f => ({ path: f.path }))
+      });
+
+      if (formattedFiles.length === 0) {
+        throw new Error("Нет валидных файлов для деплоя после фильтрации");
+      }
 
       // Отправляем запрос на деплой
       const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/deploy`, {
@@ -81,11 +98,12 @@ export const DeployButton = () => {
         })
       });
 
-      const result = await response.json();
-
       if (!response.ok) {
-        throw new Error(result.error || result.message || 'Ошибка при деплое');
+        const errorData = await response.json();
+        throw new Error(errorData.error || errorData.message || 'Ошибка при деплое');
       }
+
+      const result = await response.json();
 
       toast({
         title: "Успешно",
