@@ -19,10 +19,10 @@ export const deployFiles = async (userId, files, framework) => {
     }
 
     // Проверяем каждый файл
-    files.forEach(file => {
+    files.forEach((file, index) => {
       if (!file || !file.path || !file.content) {
-        console.error('Некорректный файл:', file);
-        throw new Error(`Некорректные данные файла: ${file?.path || 'путь не указан'}`);
+        console.error('Некорректный файл:', { index, file });
+        throw new Error(`Некорректные данные файла ${index}: ${file?.path || 'путь не указан'}`);
       }
     });
 
@@ -35,6 +35,12 @@ export const deployFiles = async (userId, files, framework) => {
       const filePath = path.join(projectDir, file.path);
       const dirPath = path.dirname(filePath);
       
+      console.log('Сохранение файла:', {
+        path: file.path,
+        dirPath,
+        filePath
+      });
+
       // Создаем поддиректории если нужно
       await fs.mkdir(dirPath, { recursive: true });
       

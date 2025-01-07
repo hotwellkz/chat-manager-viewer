@@ -5,6 +5,12 @@ export const handleDeployment = async (req, res) => {
   try {
     const { userId, files, framework } = req.body;
 
+    console.log('Получены данные для развертывания:', {
+      userId,
+      filesCount: files?.length,
+      framework
+    });
+
     // Улучшенная валидация входных данных
     if (!userId) {
       console.error('Отсутствует userId');
@@ -15,7 +21,7 @@ export const handleDeployment = async (req, res) => {
     }
 
     if (!files || !Array.isArray(files) || files.length === 0) {
-      console.error('Некорректные данные файлов:', { filesCount: files?.length });
+      console.error('Некорректные данные файлов:', { files });
       return res.status(400).json({
         success: false,
         error: 'Необходимо предоставить хотя бы один файл'
@@ -30,12 +36,6 @@ export const handleDeployment = async (req, res) => {
       });
     }
 
-    console.log('Начало процесса развертывания:', {
-      userId,
-      filesCount: files.length,
-      framework
-    });
-
     // Проверяем каждый файл перед развертыванием
     const validFiles = files.every(file => 
       file && 
@@ -44,7 +44,7 @@ export const handleDeployment = async (req, res) => {
     );
 
     if (!validFiles) {
-      console.error('Обнаружены некорректные файлы');
+      console.error('Обнаружены некорректные файлы:', files);
       return res.status(400).json({
         success: false,
         error: 'Некоторые файлы имеют некорректный формат'
@@ -53,6 +53,7 @@ export const handleDeployment = async (req, res) => {
 
     // Разворачиваем файлы
     const result = await deployFiles(userId, files, framework);
+    console.log('Результат развертывания:', result);
 
     res.json(result);
 
