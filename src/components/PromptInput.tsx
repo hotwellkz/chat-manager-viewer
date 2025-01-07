@@ -4,6 +4,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Send } from "lucide-react";
+import { saveFilesToDatabase } from "@/utils/fileStorage";
 import {
   Select,
   SelectContent,
@@ -19,47 +20,6 @@ export const PromptInput = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
-
-  const saveFilesToDatabase = async (files: any[], userId: string) => {
-    console.log('Сохранение файлов в базу данных:', {
-      filesCount: files.length,
-      userId
-    });
-
-    const savedFiles = [];
-    
-    for (const file of files) {
-      try {
-        // Сохраняем файл в базу данных
-        const { data: fileData, error: fileError } = await supabase
-          .from('files')
-          .insert({
-            user_id: userId,
-            filename: file.name || file.path,
-            file_path: file.path,
-            content: file.content,
-            content_type: 'text/plain',
-            size: Buffer.byteLength(file.content, 'utf8'),
-            version: 1
-          })
-          .select()
-          .single();
-
-        if (fileError) {
-          console.error('Ошибка сохранения файла:', fileError);
-          throw fileError;
-        }
-
-        console.log('Файл успешно сохранен:', fileData);
-        savedFiles.push(fileData);
-      } catch (error) {
-        console.error('Ошибка при сохранении файла:', error);
-        throw error;
-      }
-    }
-
-    return savedFiles;
-  };
 
   const handleDeployAfterPrompt = async (files: any[], userId: string, token: string) => {
     try {
@@ -98,15 +58,15 @@ export const PromptInput = () => {
       
       if (deployResult.success) {
         toast({
-          title: "Успешно",
-          description: "Начато развертывание проекта",
+          title: "Успешно!",
+          description: "Начинаем создание приложения",
         });
       }
     } catch (error) {
-      console.error("Error during deployment:", error);
+      console.error("Error:", error);
       toast({
         title: "Ошибка",
-        description: error.message || "Произошла ошибка при развертывании",
+        description: error.message || "Произошла ошибка при обработке запроса",
         variant: "destructive",
       });
     }

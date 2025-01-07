@@ -5,6 +5,7 @@ import { DeploymentProgress } from "./DeploymentProgress";
 import { DeploymentSteps } from "./DeploymentSteps";
 import { PlayCircle, Loader2 } from "lucide-react";
 import { Button } from "../ui/button";
+import { saveFilesToDatabase } from "@/utils/fileStorage";
 
 const STAGES = {
   idle: { progress: 0, message: 'Готов к сборке' },
@@ -63,7 +64,17 @@ export const DockerBuildManager = () => {
 
       setBuildStage('packaging');
 
-      // Запускаем процесс сборки с файлами из Supabase
+      // Сначала сохраняем файлы (на случай, если были изменения)
+      const savedFiles = await saveFilesToDatabase(
+        supabaseFiles.map(f => ({
+          path: f.file_path,
+          content: f.content,
+          name: f.filename
+        })), 
+        session.user.id
+      );
+
+      // Запускаем процесс сборки с сохраненными файлами
       const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/deploy`, {
         method: "POST",
         headers: {
@@ -73,8 +84,8 @@ export const DockerBuildManager = () => {
         credentials: 'include',
         body: JSON.stringify({
           userId: session.user.id,
-          files: supabaseFiles.map(f => ({
-            path: f.file_path,
+          files: savedFiles.map(f => ({
+            path: f.file_path.split('/').pop() || f.filename,
             content: f.content
           })),
           framework: 'react'
