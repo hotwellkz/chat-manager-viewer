@@ -22,10 +22,12 @@ export const Preview = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [selectedFileContent, setSelectedFileContent] = useState<string | null>(null);
+  const [deploymentUrl, setDeploymentUrl] = useState<string | null>(null);
   const navigate = useNavigate();
   
   useEffect(() => {
     checkAuth();
+    setupDeploymentListener();
     
     const handleShowFileContent = (event: CustomEvent<{ content: string, path: string }>) => {
       setSelectedFileContent(event.detail.content);
@@ -39,6 +41,48 @@ export const Preview = () => {
       window.removeEventListener('showFileContent', handleShowFileContent as EventListener);
     };
   }, []);
+
+  const setupDeploymentListener = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    // Подписываемся на обновления таблицы deployed_projects
+    const channel = supabase
+      .channel('deployment-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'deployed_projects',
+          filter: `user_id=eq.${session.user.id}`
+        },
+        (payload) => {
+          console.log('Получено обновление развертывания:', payload);
+          
+          if (payload.new) {
+            const { status, project_url } = payload.new as any;
+            
+            if (status === 'deployed' && project_url) {
+              setDeploymentUrl(`${import.meta.env.VITE_BACKEND_URL}${project_url}`);
+              setIsLoading(false);
+              toast.success('Приложение успешно развернуто!');
+            } else if (status === 'error') {
+              setError('Произошла ошибка при развертывании');
+              setIsLoading(false);
+              toast.error('Ошибка при развертывании');
+            } else {
+              setIsLoading(true);
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  };
 
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -59,7 +103,6 @@ export const Preview = () => {
         }
       });
       
-      // Даже если response.ok === false, но ответ получен - URL доступен
       return true;
     } catch (error) {
       console.error('Error checking URL availability:', error);
@@ -149,7 +192,7 @@ export const Preview = () => {
               </div>
             )}
             <iframe 
-              src={error ? 'about:blank' : undefined}
+              src={deploymentUrl || 'about:blank'}
               className="w-full h-full border-none"
               title="Preview"
               onError={handleIframeError}
