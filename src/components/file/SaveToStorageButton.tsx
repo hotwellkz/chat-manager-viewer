@@ -1,4 +1,4 @@
-import { Save } from "lucide-react";
+import { SaveAll } from "lucide-react";
 import { Button } from "../ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -89,7 +89,7 @@ export const SaveToStorageButton = () => {
       onClick={handleSaveAndDeploy}
       title="Сохранить и развернуть"
     >
-      <Save className="h-4 w-4" />
+      <SaveAll className="h-4 w-4" />
     </Button>
   );
 };
