@@ -20,13 +20,59 @@ export const PromptInput = () => {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
+  const saveFilesToDatabase = async (files: any[], userId: string) => {
+    console.log('Сохранение файлов в базу данных:', {
+      filesCount: files.length,
+      userId
+    });
+
+    const savedFiles = [];
+    
+    for (const file of files) {
+      try {
+        // Сохраняем файл в базу данных
+        const { data: fileData, error: fileError } = await supabase
+          .from('files')
+          .insert({
+            user_id: userId,
+            filename: file.name || file.path,
+            file_path: file.path,
+            content: file.content,
+            content_type: 'text/plain',
+            size: Buffer.byteLength(file.content, 'utf8'),
+            version: 1
+          })
+          .select()
+          .single();
+
+        if (fileError) {
+          console.error('Ошибка сохранения файла:', fileError);
+          throw fileError;
+        }
+
+        console.log('Файл успешно сохранен:', fileData);
+        savedFiles.push(fileData);
+      } catch (error) {
+        console.error('Ошибка при сохранении файла:', error);
+        throw error;
+      }
+    }
+
+    return savedFiles;
+  };
+
   const handleDeployAfterPrompt = async (files: any[], userId: string, token: string) => {
     try {
-      console.log('Запуск деплоя после получения ответа:', {
+      console.log('Начало процесса деплоя:', {
         filesCount: files.length,
         userId
       });
 
+      // Сначала сохраняем файлы
+      const savedFiles = await saveFilesToDatabase(files, userId);
+      console.log('Файлы успешно сохранены:', savedFiles);
+
+      // Теперь запускаем деплой
       const deployResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/deploy`, {
         method: "POST",
         headers: {
@@ -36,8 +82,8 @@ export const PromptInput = () => {
         credentials: 'include',
         body: JSON.stringify({
           userId,
-          files: files.map(f => ({
-            path: f.name || f.path,
+          files: savedFiles.map(f => ({
+            path: f.file_path.split('/').pop() || f.filename,
             content: f.content
           })),
           framework
@@ -130,7 +176,7 @@ export const PromptInput = () => {
         throw new Error("Неуспешный ответ от сервера");
       }
 
-      // Сразу запускаем деплой после получения файлов
+      // Сначала сохраняем файлы, потом запускаем деплой
       if (data.files && data.files.length > 0) {
         await handleDeployAfterPrompt(data.files, user.id, session.access_token);
       }
