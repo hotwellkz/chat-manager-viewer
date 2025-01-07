@@ -2,6 +2,7 @@ import { ChevronRight, ChevronDown, File, Folder, Download, Trash } from "lucide
 import { Button } from "../ui/button";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "../ui/use-toast";
 
 interface FileNodeProps {
   node: {
@@ -26,6 +27,7 @@ export const FileNode = ({
   onDownload, 
   onDelete 
 }: FileNodeProps) => {
+  const { toast } = useToast();
   const isExpanded = expanded[node.id];
   const paddingLeft = level * 16;
 
@@ -53,6 +55,51 @@ export const FileNode = ({
         window.dispatchEvent(event);
       } catch (err) {
         console.error('Error in handleFileClick:', err);
+      }
+    }
+  };
+
+  const handleDownload = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (node.type === 'file' && node.path) {
+      try {
+        // Получаем содержимое файла из базы данных
+        const { data: fileData, error: fileError } = await supabase
+          .from('files')
+          .select('content')
+          .eq('file_path', node.path)
+          .single();
+
+        if (fileError) {
+          throw fileError;
+        }
+
+        // Создаем blob из содержимого
+        const blob = new Blob([fileData.content], { type: 'text/plain' });
+        const url = window.URL.createObjectURL(blob);
+        
+        // Создаем временную ссылку для скачивания
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = node.name;
+        document.body.appendChild(a);
+        a.click();
+        
+        // Очищаем
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+
+        toast({
+          title: "Успешно",
+          description: `Файл ${node.name} скачан`,
+        });
+      } catch (error) {
+        console.error('Error downloading file:', error);
+        toast({
+          title: "Ошибка",
+          description: "Не удалось скачать файл",
+          variant: "destructive",
+        });
       }
     }
   };
@@ -95,10 +142,7 @@ export const FileNode = ({
               variant="ghost" 
               size="icon" 
               className="h-6 w-6"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDownload(node.path!);
-              }}
+              onClick={handleDownload}
             >
               <Download className="h-3 w-3" />
             </Button>
