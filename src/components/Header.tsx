@@ -51,11 +51,13 @@ export const Header = () => {
       setIsDeploying(true);
       
       // Получаем текущего пользователя
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
       
-      if (!user) {
-        throw new Error("Необходима авторизация");
+      if (userError || !user) {
+        throw new Error(userError?.message || "Необходима авторизация");
       }
+
+      console.log('Starting deployment for user:', user.id);
 
       // Получаем файлы пользователя
       const { data: files, error: filesError } = await supabase
@@ -63,11 +65,31 @@ export const Header = () => {
         .select('*')
         .eq('user_id', user.id);
 
-      if (filesError) throw filesError;
+      if (filesError) {
+        console.error('Error fetching files:', filesError);
+        throw new Error(filesError.message || "Ошибка при получении файлов");
+      }
 
       if (!files || files.length === 0) {
-        throw new Error("Нет файлов для деплоя");
+        throw new Error("Нет файлов для деплоя. Создайте хотя бы один файл.");
       }
+
+      console.log('Files ready for deployment:', files.length);
+
+      // Определяем фреймворк на основе package.json или используем react по умолчанию
+      let framework = 'react';
+      const packageJson = files.find(f => f.file_path.includes('package.json'));
+      if (packageJson?.content) {
+        try {
+          const pkg = JSON.parse(packageJson.content);
+          if (pkg.dependencies?.vue) framework = 'vue';
+          else if (pkg.dependencies?.['@nestjs/core']) framework = 'node';
+        } catch (e) {
+          console.warn('Error parsing package.json:', e);
+        }
+      }
+
+      console.log('Deploying with framework:', framework);
 
       // Отправляем запрос на деплой
       const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/deploy`, {
@@ -81,13 +103,14 @@ export const Header = () => {
             path: f.file_path,
             content: f.content
           })),
+          framework: framework,
           platform: 'vercel'
         })
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Ошибка при деплое');
+        throw new Error(error.error || error.message || 'Ошибка при деплое');
       }
 
       const result = await response.json();
