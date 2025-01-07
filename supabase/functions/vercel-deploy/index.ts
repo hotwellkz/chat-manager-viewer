@@ -59,9 +59,8 @@ serve(async (req) => {
       throw deployError
     }
 
-    // Здесь будет интеграция с Vercel API
+    // Интеграция с Vercel API
     const vercelToken = Deno.env.get('VERCEL_TOKEN')
-    const vercelTeamId = Deno.env.get('VERCEL_TEAM_ID')
 
     if (!vercelToken) {
       throw new Error('Отсутствует токен Vercel')
@@ -76,8 +75,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         name: `lovable-project-${userId}`,
-        framework: 'react', // или другой фреймворк
-        teamId: vercelTeamId
+        framework: 'react'
       })
     })
 
@@ -101,8 +99,7 @@ serve(async (req) => {
         files: files.map(file => ({
           file: file.path,
           data: file.content
-        })),
-        teamId: vercelTeamId
+        }))
       })
     })
 
