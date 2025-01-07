@@ -11,7 +11,8 @@ export const deployFiles = async (userId, files, framework) => {
     console.log('Начало развертывания файлов:', {
       userId,
       filesCount: files?.length,
-      framework
+      framework,
+      files: files.map(f => ({ path: f.path }))
     });
 
     if (!files || !Array.isArray(files) || files.length === 0) {
@@ -20,7 +21,7 @@ export const deployFiles = async (userId, files, framework) => {
 
     // Проверяем каждый файл
     files.forEach((file, index) => {
-      if (!file || !file.path || !file.content) {
+      if (!file || typeof file.path !== 'string' || typeof file.content !== 'string') {
         console.error('Некорректный файл:', { index, file });
         throw new Error(`Некорректные данные файла ${index}: ${file?.path || 'путь не указан'}`);
       }

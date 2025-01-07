@@ -8,7 +8,8 @@ export const handleDeployment = async (req, res) => {
     console.log('Получены данные для развертывания:', {
       userId,
       filesCount: files?.length,
-      framework
+      framework,
+      files: files?.map(f => ({ path: f.path }))
     });
 
     // Улучшенная валидация входных данных
