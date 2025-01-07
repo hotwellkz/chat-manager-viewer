@@ -2,23 +2,17 @@ import { ModeToggle } from "./ModeToggle";
 import { UserNav } from "./UserNav";
 import { GitHubConnect } from "./GitHubConnect";
 import { Button } from "./ui/button";
-import { Settings, LogIn, LogOut, Rocket } from "lucide-react";
+import { Settings, LogIn, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useEffect, useState } from "react";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { DeployButton } from "./deployment/DeployButton";
 
 export const Header = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isDeploying, setIsDeploying] = useState(false);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -46,74 +40,6 @@ export const Header = () => {
     navigate("/auth/login");
   };
 
-  const handleVercelDeploy = async () => {
-    try {
-      setIsDeploying(true);
-      
-      // Получаем текущего пользователя
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        throw new Error("Необходима авторизация");
-      }
-
-      // Получаем файлы пользователя
-      const { data: files, error: filesError } = await supabase
-        .from('files')
-        .select('*')
-        .eq('user_id', user.id);
-
-      if (filesError) throw filesError;
-
-      if (!files || files.length === 0) {
-        throw new Error("Нет файлов для деплоя");
-      }
-
-      // Отправляем запрос на деплой
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/deploy`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: user.id,
-          files: files.map(f => ({
-            path: f.file_path,
-            content: f.content
-          })),
-          platform: 'vercel'
-        })
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Ошибка при деплое');
-      }
-
-      const result = await response.json();
-
-      toast({
-        title: "Успешно",
-        description: "Проект отправлен на деплой в Vercel",
-      });
-
-      // Открываем Vercel в новой вкладке если есть URL
-      if (result.deploymentUrl) {
-        window.open(result.deploymentUrl, '_blank');
-      }
-
-    } catch (error) {
-      console.error('Deploy error:', error);
-      toast({
-        variant: "destructive",
-        title: "Ошибка деплоя",
-        description: error.message || "Не удалось выполнить деплой на Vercel",
-      });
-    } finally {
-      setIsDeploying(false);
-    }
-  };
-
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 max-w-screen-2xl items-center justify-between">
@@ -124,25 +50,7 @@ export const Header = () => {
         <div className="flex items-center gap-4">
           {isAuthenticated ? (
             <>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={handleVercelDeploy}
-                      disabled={isDeploying}
-                      className="hover:bg-accent"
-                    >
-                      <Rocket className={`h-5 w-5 ${isDeploying ? 'animate-pulse' : ''}`} />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Деплой на Vercel</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              
+              <DeployButton />
               <Button
                 variant="ghost"
                 size="icon"
