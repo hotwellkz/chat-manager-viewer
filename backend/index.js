@@ -22,12 +22,23 @@ app.use(express.json());
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const uploadsDir = path.join(__dirname, 'uploads');
+const deploymentsDir = path.join(__dirname, 'deployments');
+
+// Создаем директории если их нет
+[uploadsDir, deploymentsDir].forEach(dir => {
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+});
 
 // Подключаем маршруты API
 app.use('/api', apiRouter);
 
-// Статические файлы
+// Статические файлы для загрузок
 app.use('/uploads', express.static(uploadsDir));
+
+// Статические файлы для развернутых приложений
+app.use('/deployments', express.static(deploymentsDir));
 
 // Корневой маршрут
 app.get('/', (req, res) => {
