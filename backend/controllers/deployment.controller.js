@@ -5,24 +5,51 @@ export const handleDeployment = async (req, res) => {
   try {
     const { userId, files, framework } = req.body;
 
-    // Добавляем валидацию входных данных
-    if (!userId || !files || !framework) {
-      console.error('Missing required fields:', { userId, filesCount: files?.length, framework });
+    // Улучшенная валидация входных данных
+    if (!userId) {
+      console.error('Отсутствует userId');
       return res.status(400).json({
         success: false,
-        error: 'Missing required fields: userId, files, or framework'
+        error: 'Отсутствует идентификатор пользователя'
       });
     }
 
-    if (!Array.isArray(files) || files.length === 0) {
-      console.error('Files must be a non-empty array');
+    if (!files || !Array.isArray(files) || files.length === 0) {
+      console.error('Некорректные данные файлов:', { filesCount: files?.length });
       return res.status(400).json({
         success: false,
-        error: 'Files must be a non-empty array'
+        error: 'Необходимо предоставить хотя бы один файл'
       });
     }
 
-    console.log('Starting deployment process for user:', userId, 'framework:', framework);
+    if (!framework) {
+      console.error('Не указан фреймворк');
+      return res.status(400).json({
+        success: false,
+        error: 'Необходимо указать фреймворк'
+      });
+    }
+
+    console.log('Начало процесса развертывания:', {
+      userId,
+      filesCount: files.length,
+      framework
+    });
+
+    // Проверяем каждый файл перед развертыванием
+    const validFiles = files.every(file => 
+      file && 
+      typeof file.path === 'string' && 
+      typeof file.content === 'string'
+    );
+
+    if (!validFiles) {
+      console.error('Обнаружены некорректные файлы');
+      return res.status(400).json({
+        success: false,
+        error: 'Некоторые файлы имеют некорректный формат'
+      });
+    }
 
     // Разворачиваем файлы
     const result = await deployFiles(userId, files, framework);
@@ -30,10 +57,10 @@ export const handleDeployment = async (req, res) => {
     res.json(result);
 
   } catch (error) {
-    console.error('Deployment error:', error);
+    console.error('Ошибка развертывания:', error);
     res.status(500).json({ 
       success: false, 
-      error: error.message || 'Failed to deploy project'
+      error: error.message || 'Не удалось развернуть проект'
     });
   }
 };

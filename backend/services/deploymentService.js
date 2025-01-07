@@ -10,8 +10,20 @@ export const deployFiles = async (userId, files, framework) => {
   try {
     console.log('Начало развертывания файлов:', {
       userId,
-      filesCount: files.length,
+      filesCount: files?.length,
       framework
+    });
+
+    if (!files || !Array.isArray(files) || files.length === 0) {
+      throw new Error('Файлы для развертывания не предоставлены');
+    }
+
+    // Проверяем каждый файл
+    files.forEach(file => {
+      if (!file || !file.path || !file.content) {
+        console.error('Некорректный файл:', file);
+        throw new Error(`Некорректные данные файла: ${file?.path || 'путь не указан'}`);
+      }
     });
 
     // Создаем директорию для проекта
@@ -48,7 +60,10 @@ export const deployFiles = async (userId, files, framework) => {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Ошибка при обновлении статуса развертывания:', error);
+      throw error;
+    }
 
     console.log('Развертывание завершено успешно:', {
       deploymentUrl,
