@@ -12,16 +12,18 @@ serve(async (req) => {
   }
 
   try {
-    const { userId, files, platform } = await req.json()
+    const { userId, files, framework } = await req.json()
 
-    if (!userId || !files || !Array.isArray(files)) {
-      throw new Error('Некорректные данные для деплоя')
+    // Проверяем наличие всех необходимых полей
+    if (!userId || !files || !Array.isArray(files) || !framework) {
+      console.error('Некорректные данные:', { userId, filesCount: files?.length, framework })
+      throw new Error('Отсутствуют обязательные поля: userId, files или framework')
     }
 
     console.log('Подготовка к деплою на Vercel:', {
       userId,
       filesCount: files.length,
-      platform
+      framework
     })
 
     const supabase = createClient(
@@ -34,59 +36,49 @@ serve(async (req) => {
       .from('deployed_projects')
       .select('*')
       .eq('user_id', userId)
-      .eq('framework', 'vercel')
-      .single()
+      .eq('framework', framework)
+      .maybeSingle()
 
-    if (projectError && projectError.code !== 'PGRST116') {
+    if (projectError) {
       console.error('Ошибка при проверке проекта:', projectError)
       throw projectError
     }
 
-    // Создаем или обновляем запись о деплое
-    const { data: deployment, error: deployError } = await supabase
-      .from('deployed_projects')
-      .upsert({
-        user_id: userId,
-        framework: 'vercel',
-        status: 'deploying',
-        last_deployment: new Date().toISOString()
-      })
-      .select()
-      .single()
-
-    if (deployError) {
-      console.error('Ошибка при создании записи о деплое:', deployError)
-      throw deployError
-    }
-
-    // Интеграция с Vercel API
     const vercelToken = Deno.env.get('VERCEL_TOKEN')
-
     if (!vercelToken) {
       throw new Error('Отсутствует токен Vercel')
     }
 
-    // Создаем проект в Vercel
-    const createProjectResponse = await fetch('https://api.vercel.com/v9/projects', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${vercelToken}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        name: `lovable-project-${userId}`,
-        framework: 'react'
-      })
-    })
+    let vercelProjectId = existingProject?.project_url?.split('/').pop()
+    let deploymentUrl
 
-    if (!createProjectResponse.ok) {
-      const error = await createProjectResponse.json()
-      throw new Error(`Ошибка создания проекта в Vercel: ${error.message}`)
+    if (!vercelProjectId) {
+      // Создаем новый проект в Vercel
+      console.log('Создание нового проекта в Vercel')
+      const createProjectResponse = await fetch('https://api.vercel.com/v9/projects', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${vercelToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: `lovable-project-${userId}-${framework}`,
+          framework: framework.toLowerCase()
+        })
+      })
+
+      if (!createProjectResponse.ok) {
+        const error = await createProjectResponse.json()
+        console.error('Ошибка создания проекта:', error)
+        throw new Error(`Ошибка создания проекта в Vercel: ${error.message}`)
+      }
+
+      const project = await createProjectResponse.json()
+      vercelProjectId = project.id
     }
 
-    const project = await createProjectResponse.json()
-
     // Создаем деплой
+    console.log('Отправка файлов на деплой:', { projectId: vercelProjectId })
     const deployResponse = await fetch('https://api.vercel.com/v13/deployments', {
       method: 'POST',
       headers: {
@@ -95,7 +87,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         name: `lovable-deployment-${Date.now()}`,
-        projectId: project.id,
+        projectId: vercelProjectId,
         files: files.map(file => ({
           file: file.path,
           data: file.content
@@ -105,30 +97,35 @@ serve(async (req) => {
 
     if (!deployResponse.ok) {
       const error = await deployResponse.json()
+      console.error('Ошибка деплоя:', error)
       throw new Error(`Ошибка деплоя в Vercel: ${error.message}`)
     }
 
     const deployResult = await deployResponse.json()
+    deploymentUrl = deployResult.url
 
-    // Обновляем статус деплоя
-    const { error: updateError } = await supabase
+    // Обновляем или создаем запись о проекте
+    const { error: upsertError } = await supabase
       .from('deployed_projects')
-      .update({
+      .upsert({
+        user_id: userId,
+        framework: framework,
+        project_url: deploymentUrl,
         status: 'deployed',
-        project_url: deployResult.url
+        last_deployment: new Date().toISOString()
       })
-      .eq('id', deployment.id)
 
-    if (updateError) {
-      console.error('Ошибка при обновлении статуса:', updateError)
-      throw updateError
+    if (upsertError) {
+      console.error('Ошибка при обновлении статуса:', upsertError)
+      throw upsertError
     }
+
+    console.log('Деплой успешно завершен:', { deploymentUrl })
 
     return new Response(
       JSON.stringify({
         success: true,
-        deploymentUrl: deployResult.url,
-        deploymentId: deployment.id
+        deploymentUrl,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

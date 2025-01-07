@@ -29,6 +29,14 @@ export const handleDeployment = async (req, res) => {
       });
     }
 
+    if (!framework) {
+      console.error('Не указан фреймворк');
+      return res.status(400).json({
+        success: false,
+        error: 'Необходимо указать фреймворк'
+      });
+    }
+
     // Проверяем каждый файл перед развертыванием
     const validFiles = files.every(file => 
       file && 
@@ -47,6 +55,14 @@ export const handleDeployment = async (req, res) => {
     let result;
     
     if (platform === 'vercel') {
+      // Проверяем существующий проект
+      const { data: existingProject } = await supabase
+        .from('deployed_projects')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('framework', framework)
+        .maybeSingle();
+
       // Вызываем Edge Function для деплоя на Vercel
       const response = await fetch(`${process.env.SUPABASE_URL}/functions/v1/vercel-deploy`, {
         method: 'POST',
@@ -54,7 +70,12 @@ export const handleDeployment = async (req, res) => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`
         },
-        body: JSON.stringify({ userId, files, platform })
+        body: JSON.stringify({ 
+          userId, 
+          files, 
+          framework,
+          projectId: existingProject?.id 
+        })
       });
 
       if (!response.ok) {
